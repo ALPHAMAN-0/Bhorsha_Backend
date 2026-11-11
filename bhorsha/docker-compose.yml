@@ -1,0 +1,29 @@
+# Bhorsha database — runs the published image from Docker Hub. No build, no SQL files needed.
+#
+# Needs Docker. Settings come from .env (make it with: cp .env.example .env).
+# Without a .env it still works, using the defaults below.
+#   docker compose up -d        start (first run downloads the image and loads tables + demo data)
+#   docker compose ps           wait until bhorsha-db shows "(healthy)"
+#   docker compose down         stop (data is kept)
+#   docker compose down -v      stop and DELETE data (next "up" loads a fresh seed)
+#
+# Connect: host localhost, port 5433, database bhorsha, user bhorsha, password from .env
+name: bhorsha
+
+services:
+  db:
+    image: ${DB_IMAGE:-siam001/bhorsha-db:latest}
+    container_name: bhorsha-db
+    restart: unless-stopped
+    environment:
+      # Same values for everyone. Set in .env; these defaults are used if .env is missing.
+      POSTGRES_DB: ${POSTGRES_DB:-bhorsha}
+      POSTGRES_USER: ${POSTGRES_USER:-bhorsha}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
+    ports:
+      - "${DB_PORT:-5433}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:
