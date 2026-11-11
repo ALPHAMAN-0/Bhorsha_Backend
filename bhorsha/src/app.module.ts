@@ -3,8 +3,6 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
-import { FleetModule } from './fleet/fleet.module.js';
-import { UsersModule } from './users/users.module.js';
 
 @Module({
   imports: [
@@ -22,8 +20,6 @@ import { UsersModule } from './users/users.module.js';
         synchronize: true,
       }),
     }),
-    UsersModule,
-    FleetModule,
   ],
   controllers: [AppController],
   providers: [AppService],
