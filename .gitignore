@@ -1,0 +1,11 @@
+# Ignore root legacy files and local configs
+_old_monorepo_backup/
+apps/
+packages/
+node_modules/
+.env
+docker-compose.yml
+package.json
+package-lock.json
+pnpm-workspace.yaml
+turbo.json
