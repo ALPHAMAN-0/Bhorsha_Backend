@@ -27,7 +27,7 @@ import { UsersModule } from './users/users.module.js';
         password: config.get<string>('DB_PASSWORD') || '',
         database: config.getOrThrow<string>('DB_NAME'),
         autoLoadEntities: true,
-        synchronize: true,
+        synchronize: false, // the Docker image already creates the tables
       }),
     }),
     UsersModule,

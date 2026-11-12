@@ -4,7 +4,7 @@ apps/
 packages/
 node_modules/
 .env
-docker-compose.yml
+/docker-compose.yml
 package.json
 package-lock.json
 pnpm-workspace.yaml
