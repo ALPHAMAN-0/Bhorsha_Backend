@@ -17,7 +17,6 @@ async function bootstrap() {
     .setTitle('Bhorsha (ভরসা) - Rider Domain API')
     .setDescription(
       'Fair Ride-Hailing & Ride-Sharing Platform for Dhaka\n\n' +
-      '**Engineer:** Numman (Student ID: 23-54538-3) — Rider Domain Backend Engineer\n\n' +
       '### How to Authenticate in Swagger:\n' +
       'Simply type your User ID in the **`x-user-id`** input box of each endpoint (e.g. `1` for Rider, `2` for Passenger).',
     )
