@@ -64,8 +64,8 @@ app both read it. Without a `.env`, Docker Compose still works using the same de
 docker compose up -d         # older Docker installs: docker-compose up -d
 ```
 
-The first run downloads the image `siam001/bhorsha-db:1.0.0`, creates the network and starts
-the `bhorsha-db` container.
+The first run downloads the image `siam001/bhorsha-db:2.0.0` (schema v2: 13 tables), creates the
+network and starts the `bhorsha-db` container.
 
 ![Database image pulled and container started](photo/Database%20Pull.png)
 

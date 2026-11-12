@@ -1,18 +1,22 @@
 # Bhorsha database — runs the published image from Docker Hub. No build, no SQL files needed.
 #
-# Needs Docker. Settings come from .env (make it with: cp .env.example .env).
+# Needs Docker. Settings come from .env (make it with: cp env.example .env).
 # Without a .env it still works, using the defaults below.
 #   docker compose up -d        start (first run downloads the image and loads tables + demo data)
 #   docker compose ps           wait until bhorsha-db shows "(healthy)"
 #   docker compose down         stop (data is kept)
 #   docker compose down -v      stop and DELETE data (next "up" loads a fresh seed)
 #
+# Upgrading to a new image version: the tables are created only when the data volume is empty,
+# so run `docker compose down -v` once after changing DB_IMAGE, then `docker compose up -d`.
+#
 # Connect: host localhost, port 5433, database bhorsha, user bhorsha, password from .env
 name: bhorsha
 
 services:
   db:
-    image: ${DB_IMAGE:-siam001/bhorsha-db:latest}
+    # Schema v2.0.0: 13 tables (Architecture v3.1). Pinned, so everyone runs the same schema.
+    image: ${DB_IMAGE:-siam001/bhorsha-db:2.0.0}
     container_name: bhorsha-db
     restart: unless-stopped
     environment:
