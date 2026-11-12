@@ -3,6 +3,14 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
+import { IdentityModule } from './modules/identity/identity.module.js';
+import { FleetModule } from './modules/fleet/fleet.module.js';
+import { PricingModule } from './modules/pricing/pricing.module.js';
+import { TripsModule } from './modules/trips/trips.module.js';
+import { SharingModule } from './modules/sharing/sharing.module.js';
+import { TrustModule } from './modules/trust/trust.module.js';
+import { NotifyModule } from './modules/notify/notify.module.js';
+import { AuditModule } from './modules/audit/audit.module.js';
 
 @Module({
   imports: [
@@ -21,7 +29,7 @@ import { AppService } from './app.service.js';
         logging: config.get('DB_LOGGING') === 'true',
         extra: { max: Number(config.get('DB_POOL_MAX', 10)) },
       }),
-    }),
+    }), IdentityModule, FleetModule, PricingModule, TripsModule, SharingModule, TrustModule, NotifyModule, AuditModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -1,132 +1,71 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Bhorsha API
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+The NestJS backend of Bhorsha, the fair ride-hailing and ride-sharing platform for Dhaka. This folder is the CSC4161 course release of Architecture v3.1: a backend-only API, shown through Swagger UI and Postman and built around driver-to-rider requests.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+The architecture, the 54 planned endpoints and who builds what are in the [main README](../README.md), especially [§26 CSC4161 Course Release](../README.md#26-csc4161-course-release).
 
-## Description
+## Run it
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
-
-## Project setup
+Needs Node.js 20.19+, 22.13+ or 24.11+, pnpm and Docker.
 
 ```bash
-$ pnpm install
+pnpm install
+cp env.example .env        # Windows: copy env.example .env
+docker compose up -d       # PostgreSQL 16 with the 13 tables and demo data
+pnpm start:dev             # http://localhost:3000
 ```
 
-## Compile and run the project
+Wait until `docker compose ps` shows `bhorsha-db` as `(healthy)` before you start the API. Demo logins and demo data are in [main README §20](../README.md#20-getting-started). The database reference is [doc/databaseSQL.md](doc/databaseSQL.md).
 
-```bash
-# development
-$ pnpm run start
+## Folder structure
 
-# watch mode
-$ pnpm run start:dev
+`src/` follows the architecture document (§9), and the module folders follow its modules (§8).
 
-# production mode
-$ pnpm run start:prod
+```text
+src/
+├── main.ts              bootstrap: ValidationPipe, the /api/v1 prefix and Swagger go here
+├── app.module.ts        ConfigModule + TypeORM (synchronize off)
+├── common/
+│   ├── decorators/      @Public(), @Roles(), @CurrentUser()          Siam
+│   ├── filters/         global exception filter                      Siam
+│   ├── guards/          JwtAuthGuard, RolesGuard                     Siam
+│   ├── interceptors/    timing and envelope (Roshni), audit (Anyka)
+│   └── middleware/      request logging and the request ID           Anyka
+├── config/              env loading and validation                   Numman
+├── database/            data-source.ts (TypeORM CLI), migrations/    Siam
+└── modules/
+    ├── identity/        auth and users                               Siam
+    ├── fleet/           driver profiles and vehicles                 Roshni, Siam
+    ├── pricing/         fare rules and the fare quote                Siam, Numman
+    ├── trips/           rides, passengers, ratings, SOS              Numman, Roshni
+    ├── sharing/         route offers, invites, join requests         Roshni, Numman
+    ├── trust/           cases, strikes, appeals                      Anyka
+    ├── notify/          mailer (SOS email)                           Numman
+    └── audit/           audit-log reads                              Anyka
 ```
 
-## Run tests
+Each module keeps its own entities, DTOs, controllers and services, for example `modules/fleet/entities/vehicle.entity.ts`. Folders without code yet hold an empty `.gitkeep`. The table of who builds which part is in [main README §9](../README.md#in-this-repo).
 
-```bash
-# unit tests
-$ pnpm run test
+## Scripts
 
-# e2e tests
-$ pnpm run test:e2e
+| Command | Does |
+|---|---|
+| `pnpm start:dev` | Run the API and restart on changes |
+| `pnpm build`, then `pnpm start:prod` | Compile to `dist/` and run it |
+| `pnpm lint` | oxlint (type-aware) on `src/` and `test/` |
+| `pnpm format` | Prettier on `src/` and `test/` |
+| `pnpm test` | Unit tests (`*.spec.ts`, Vitest) |
+| `pnpm test:e2e` | End-to-end tests (`test/*.e2e-spec.ts`, Supertest) |
+| `pnpm test:cov` | Unit tests with coverage |
 
-# test coverage
-$ pnpm run test:cov
-```
+## Rules every endpoint follows
 
-## Deployment
+From §8 and §26 of the architecture:
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
-
-```bash
-$ pnpm install -g @nestjs/mau
-$ mau deploy
-```
-
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
-
-## Observability
-
-In production applications, observability is essential for understanding how your system behaves, detecting issues early, and maintaining reliable performance.
-
-[NestJS Observe](https://observe.nestjs.com) automatically instruments your NestJS application, giving you deep visibility into your system with minimal setup:
-
-- **Distributed tracing:** Follow requests across services and understand how they flow through your system.
-- **Waterfall analysis:** Visualize request execution and identify slow operations, bottlenecks, and unexpected delays.
-- **Performance analysis:** Analyze application performance in real time and quickly pinpoint areas that need optimization.
-- **Metrics:** Track key application and infrastructure metrics to understand system health and performance trends.
-- **Logging:** Centralize and correlate logs with traces and other telemetry to make debugging easier.
-- **Error tracking:** Detect errors quickly and investigate their root causes with the surrounding context.
-- **SLA monitoring:** Track service-level objectives and identify when your application is approaching or exceeding defined thresholds.
-- **Alarms and alerts:** Set up alerts for critical errors, performance degradation, SLA violations, and other anomalies so your team can react quickly.
-
-To add it to this project, run this and approve the code it prints at [observe.nestjs.com/link](https://observe.nestjs.com/link) - signing up for free if you have no account:
-
-```bash
-$ npx @nestjs/observe link
-```
-
-It installs `@nestjs/observe`, wires it into `AppModule` and `main.ts`, and writes the app key and secret into `.env`, which every `nest start` script (`start`, `start:dev`, `start:debug`) then loads. In production, set `OBSERVE_APP_KEY` and `OBSERVE_APP_SECRET` in the environment instead.
-
-Or do it by hand:
-
-```bash
-$ pnpm install @nestjs/observe
-```
-
-Then follow the [setup guide](https://docs.nestjs.com/observability/sdk) - it takes a single import and an app key.
-
-The free plan needs no payment details and covers 300,000 events a month. You can also browse the [live demo](https://www.observe-demo.nestjs.com/dashboard) first - the whole dashboard over a busy service's data, with nothing to install.
-
-## Resources
-
-Check out a few resources that may come in handy when working with NestJS:
-
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Auto-instrument your application with [NestJS Observe](https://observe.nestjs.com). Distributed tracing, metrics, and logging made easy. Error tracking and performance monitoring for your NestJS applications.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
-
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+- Routes live under `/api/v1`, and Swagger is at `/api/docs`.
+- Every body, query and route parameter is a DTO. The global ValidationPipe uses whitelist, forbidNonWhitelisted and transform, and a 400 lists each failing field.
+- Success: `{ success, message, data, meta }`. Error: `{ success: false, error: { code, message, details }, meta: { requestId } }`.
+- PostgreSQL errors 23505, 23503 and 23514 become 409. Anything else is a 500 with a generic message and no stack trace.
+- Protected routes check the JWT and the role: no token gets 401, and the wrong role gets 403.
+- `synchronize` stays off, and every table change comes with a migration.
+- Money is integer paisa, and `password_hash` never appears in a response.
