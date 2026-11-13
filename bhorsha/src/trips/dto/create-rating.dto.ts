@@ -9,11 +9,11 @@ import {
 
 export class CreateRatingDto {
   @ApiProperty({
-    example: 'cf9bdb60-e143-4ec2-8868-2dc4289cb912',
-    description: 'Ride UUID',
+    example: 5,
+    description: 'Ride ID',
   })
-  @IsString()
-  ride_id: string;
+  @IsInt()
+  ride_id: number;
 
   @ApiProperty({
     example: 2,

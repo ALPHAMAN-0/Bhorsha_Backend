@@ -18,10 +18,13 @@ export class JoinRequest {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ type: 'varchar', length: 100 })
-  ride_id: string;
+  @Column({ type: 'int' })
+  ride_id: number;
 
   @Column({ type: 'int' })
+  rider_id: number;
+
+  @Column({ type: 'int', nullable: true })
   passenger_id: number;
 
   @Column({ type: 'double precision', default: 23.8103 })
@@ -29,6 +32,12 @@ export class JoinRequest {
 
   @Column({ type: 'double precision', default: 90.4125 })
   pickup_lng: number;
+
+  @Column({ type: 'double precision', default: 23.7925 })
+  drop_lat: number;
+
+  @Column({ type: 'double precision', default: 90.4078 })
+  drop_lng: number;
 
   @Column({ type: 'double precision', default: 23.7925 })
   dropoff_lat: number;
@@ -48,6 +57,9 @@ export class JoinRequest {
     default: JoinRequestStatus.PENDING,
   })
   status: JoinRequestStatus;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  decided_at: Date | null;
 
   @CreateDateColumn({ type: 'timestamptz' })
   created_at: Date;

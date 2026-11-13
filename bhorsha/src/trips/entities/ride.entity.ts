@@ -17,8 +17,8 @@ export enum RideStatus {
 
 @Entity('rides')
 export class Ride {
-  @PrimaryGeneratedColumn('uuid')
-  id: string;
+  @PrimaryGeneratedColumn()
+  id: number;
 
   @Column({ type: 'int' })
   rider_id: number;
@@ -64,6 +64,15 @@ export class Ride {
 
   @Column({ type: 'int', default: 1 })
   seats_booked: number;
+
+  @Column({ type: 'smallint', default: 0 })
+  seats_free: number;
+
+  @Column({ type: 'varchar', nullable: true })
+  cancel_reason: string | null;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  cancelled_at: Date | null;
 
   @CreateDateColumn({ type: 'timestamptz' })
   created_at: Date;

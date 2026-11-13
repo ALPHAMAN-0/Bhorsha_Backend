@@ -15,11 +15,17 @@ export class RidePassenger {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ type: 'varchar', length: 100 })
-  ride_id: string;
+  @Column({ type: 'int' })
+  ride_id: number;
 
   @Column({ type: 'int' })
+  rider_id: number;
+
+  @Column({ type: 'int', nullable: true })
   passenger_id: number;
+
+  @Column({ type: 'int', nullable: true })
+  join_request_id: number | null;
 
   @Column({ type: 'int', default: 1 })
   seats: number;
@@ -33,6 +39,9 @@ export class RidePassenger {
     default: PassengerStatus.CONFIRMED,
   })
   status: PassengerStatus;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  cancelled_at: Date | null;
 
   @CreateDateColumn({ type: 'timestamptz' })
   joined_at: Date;

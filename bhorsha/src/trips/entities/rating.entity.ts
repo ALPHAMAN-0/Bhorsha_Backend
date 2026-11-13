@@ -12,14 +12,23 @@ export class Rating {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ type: 'varchar', length: 100 })
-  ride_id: string;
+  @Column({ type: 'int' })
+  ride_id: number;
+
+  @Column({ type: 'int', nullable: true })
+  from_user_id: number | null;
+
+  @Column({ type: 'int', nullable: true })
+  to_user_id: number | null;
 
   @Column({ type: 'int' })
   rater_id: number;
 
   @Column({ type: 'int' })
   ratee_id: number;
+
+  @Column({ type: 'smallint', nullable: true })
+  stars: number | null;
 
   @Column({ type: 'smallint' })
   score: number;

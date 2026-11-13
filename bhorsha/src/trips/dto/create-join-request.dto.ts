@@ -10,11 +10,11 @@ import {
 
 export class CreateJoinRequestDto {
   @ApiProperty({
-    example: 'cf9bdb60-e143-4ec2-8868-2dc4289cb912',
-    description: 'Target Ride UUID to join',
+    example: 5,
+    description: 'Target Ride ID to join',
   })
-  @IsString()
-  ride_id: string;
+  @IsInt()
+  ride_id: number;
 
   @ApiPropertyOptional({
     example: 1,

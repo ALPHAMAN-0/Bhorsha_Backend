@@ -9,7 +9,7 @@ import { RideStatus } from '../src/trips/entities/ride.entity.js';
 
 describe('Rider Domain Complete Lifecycle Suite (13 Endpoints End-to-End)', () => {
   let app: INestApplication<App>;
-  let createdRideId: string;
+  let createdRideId: number;
   let passenger2JoinRequestId: number;
   let passenger3JoinRequestId: number;
 
@@ -202,7 +202,7 @@ describe('Rider Domain Complete Lifecycle Suite (13 Endpoints End-to-End)', () =
       .expect(201);
 
     expect(res.body.status).toBe('TRIGGERED');
-    expect(res.body.ride_id).toBe(createdRideId);
+    expect(Number(res.body.ride_id)).toBe(createdRideId);
     expect(res.body.user_id).toBe(PASSENGER_2);
   });
 
