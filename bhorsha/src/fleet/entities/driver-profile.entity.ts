@@ -4,7 +4,7 @@ import { Vehicle } from './vehicle.entity.js';
 
 export enum DriverVerification {
   PENDING = 'PENDING',
-  APPROVED = 'APPROVED',
+  VERIFIED = 'VERIFIED',
   REJECTED = 'REJECTED',
 }
 
@@ -30,9 +30,6 @@ export class DriverProfile {
 
   @Column({ type: 'enum', enum: DriverAvailability, default: DriverAvailability.OFFLINE })
   status: DriverAvailability;
-
-  @Column({ type: 'real', default: 5 })
-  rating: number;
 
   @Column({ name: 'last_lat', type: 'double precision', nullable: true })
   lastLat: number | null;

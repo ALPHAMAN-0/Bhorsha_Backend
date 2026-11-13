@@ -58,12 +58,7 @@ export class VehiclesService {
     if (dto.regNo && dto.regNo !== vehicle.regNo) {
       await this.assertRegNoFree(dto.regNo);
     }
-    const type = dto.type ?? vehicle.type;
-    return this.vehicles.save({
-      ...vehicle,
-      ...dto,
-      seats: SEAT_CAPACITY[type],
-    });
+    return this.vehicles.save({ ...vehicle, ...dto });
   }
 
   async remove(userId: number, id: number): Promise<void> {
@@ -79,10 +74,7 @@ export class VehiclesService {
   }
 
   private async assertRegNoFree(regNo: string): Promise<void> {
-    const taken = await this.vehicles.exists({
-      where: { regNo },
-      withDeleted: true,
-    });
+    const taken = await this.vehicles.exists({ where: { regNo } });
     if (taken) {
       throw new ConflictException(
         `Registration number ${regNo} is already used`,
