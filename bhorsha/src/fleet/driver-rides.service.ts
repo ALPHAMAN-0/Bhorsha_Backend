@@ -2,9 +2,16 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
+  NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import {
+  DataSource,
+  QueryFailedError,
+  QueryResult,
+  QueryRunner,
+  Repository,
+} from 'typeorm';
 import { DriversService } from './drivers.service.js';
 import { DriverAvailability } from './entities/driver-profile.entity.js';
 import { Vehicle } from './entities/vehicle.entity.js';
@@ -12,6 +19,8 @@ import { Vehicle } from './entities/vehicle.entity.js';
 const SEARCH_RADIUS_KM = 3;
 const OPEN_REQUEST_WINDOW = '10 minutes';
 const MAX_RESULTS = 20;
+const ACTIVE_RIDE_INDEX = 'uq_rides_one_active_per_driver';
+const PICKUP_STATUSES = ['ACCEPTED', 'ARRIVED', 'IN_PROGRESS'];
 
 const OPEN_RIDES_SQL = `
 SELECT r.id AS "rideId",
@@ -38,6 +47,45 @@ SELECT r.id AS "rideId",
  ORDER BY d.km
  LIMIT $6`;
 
+const LOCK_RIDE_SQL = `
+SELECT id, status, vehicle_type AS "vehicleType", driver_id AS "driverId", version
+  FROM rides
+ WHERE id = $1
+   FOR UPDATE`;
+
+const FIND_VEHICLE_SQL = `
+SELECT id
+  FROM vehicles
+ WHERE driver_id = $1 AND type = $2 AND deleted_at IS NULL
+ ORDER BY id
+ LIMIT 1
+   FOR SHARE`;
+
+
+const ACCEPT_RIDE_SQL = `
+UPDATE rides
+   SET status = 'ACCEPTED', driver_id = $2, vehicle_id = $3, accepted_at = now()
+ WHERE id = $1 AND status = 'REQUESTED' AND version = $4
+RETURNING id AS "rideId", status, vehicle_type AS "vehicleType", is_shared AS "isShared",
+          seats_free AS "seatsFree", driver_id AS "driverId", vehicle_id AS "vehicleId",
+          accepted_at AS "acceptedAt", version`;
+
+const MARK_ARRIVAL_SQL = `
+UPDATE ride_passengers
+   SET arrived_at = now()
+ WHERE id = (SELECT id
+               FROM ride_passengers
+              WHERE ride_id = $1 AND status = 'CONFIRMED' AND arrived_at IS NULL
+              ORDER BY id
+              LIMIT 1
+                FOR UPDATE)
+RETURNING id AS "passengerId", arrived_at AS "arrivedAt"`;
+
+const MOVE_TO_ARRIVED_SQL = `
+UPDATE rides
+   SET status = 'ARRIVED'
+ WHERE id = $1 AND status = 'ACCEPTED' AND version = $2`;
+
 interface OpenRideRow {
   rideId: number;
   vehicleType: string;
@@ -56,12 +104,40 @@ export interface OpenRide {
   distanceKm: number;
 }
 
+interface LockedRide {
+  id: number;
+  status: string;
+  vehicleType: string;
+  driverId: number | null;
+  version: number;
+}
+
+export interface AcceptedRide {
+  rideId: number;
+  status: string;
+  vehicleType: string;
+  isShared: boolean;
+  seatsFree: number;
+  driverId: number;
+  vehicleId: number;
+  acceptedAt: Date;
+  version: number;
+}
+
+export interface Arrival {
+  rideId: number;
+  status: string;
+  passengerId: number;
+  arrivedAt: Date;
+}
+
 @Injectable()
 export class DriverRidesService {
   constructor(
     private readonly driversService: DriversService,
     @InjectRepository(Vehicle)
     private readonly vehicles: Repository<Vehicle>,
+    private readonly dataSource: DataSource,
   ) {}
 
   async findOpen(userId: number): Promise<OpenRide[]> {
@@ -94,4 +170,116 @@ export class DriverRidesService {
       distanceKm: Number(row.distanceKm),
     }));
   }
+
+  async accept(userId: number, rideId: number): Promise<AcceptedRide> {
+    const profile = await this.driversService.findMe(userId);
+    if (profile.status !== DriverAvailability.ONLINE) {
+      throw new ForbiddenException('Go online to accept rides');
+    }
+
+    return this.inTransaction(async (runner) => {
+      const ride = await this.lockRide(runner, rideId);
+      if (ride.status !== 'REQUESTED') {
+        throw new ConflictException('Ride is no longer available');
+      }
+      const vehicleId = await this.findVehicleFor(runner, userId, ride.vehicleType);
+      return this.markAccepted(runner, ride, userId, vehicleId);
+    });
+  }
+
+  async arrive(userId: number, rideId: number): Promise<Arrival> {
+    await this.driversService.findMe(userId);
+
+    return this.inTransaction(async (runner) => {
+      const ride = await this.lockRide(runner, rideId);
+      if (ride.driverId !== userId) {
+        throw new ForbiddenException('This ride belongs to another driver');
+      }
+      if (!PICKUP_STATUSES.includes(ride.status)) {
+        throw new ConflictException('This ride is not waiting for a pickup');
+      }
+      const result: QueryResult = await runner.query(MARK_ARRIVAL_SQL, [rideId], true);
+      if (result.records.length === 0) {
+        throw new ConflictException('No passenger is waiting for a pickup');
+      }
+      const status = await this.moveToArrived(runner, ride);
+      return { rideId, status, ...result.records[0] } as Arrival;
+    });
+  }
+
+  private async inTransaction<T>(work: (runner: QueryRunner) => Promise<T>): Promise<T> {
+    const runner = this.dataSource.createQueryRunner();
+    await runner.connect();
+    await runner.startTransaction();
+    try {
+      const result = await work(runner);
+      await runner.commitTransaction();
+      return result;
+    } catch (error) {
+      await runner.rollbackTransaction();
+      throw error;
+    } finally {
+      await runner.release();
+    }
+  }
+
+  private async lockRide(runner: QueryRunner, rideId: number): Promise<LockedRide> {
+    const rows: LockedRide[] = await runner.query(LOCK_RIDE_SQL, [rideId]);
+    if (rows.length === 0) {
+      throw new NotFoundException(`Ride ${rideId} not found`);
+    }
+    return rows[0];
+  }
+
+  private async findVehicleFor(
+    runner: QueryRunner,
+    userId: number,
+    vehicleType: string,
+  ): Promise<number> {
+    const rows: { id: number }[] = await runner.query(FIND_VEHICLE_SQL, [userId, vehicleType]);
+    if (rows.length === 0) {
+      throw new ConflictException(`You need an active ${vehicleType} for this ride`);
+    }
+    return rows[0].id;
+  }
+
+  private async markAccepted(
+    runner: QueryRunner,
+    ride: LockedRide,
+    userId: number,
+    vehicleId: number,
+  ): Promise<AcceptedRide> {
+    try {
+      const result: QueryResult<AcceptedRide> = await runner.query(
+        ACCEPT_RIDE_SQL,
+        [ride.id, userId, vehicleId, ride.version],
+        true,
+      );
+      if (result.records.length === 0) {
+        throw new ConflictException('Ride is no longer available');
+      }
+      return result.records[0];
+    } catch (error) {
+      if (isActiveRideClash(error)) {
+        throw new ConflictException('You already have an active ride');
+      }
+      throw error;
+    }
+  }
+
+  private async moveToArrived(runner: QueryRunner, ride: LockedRide): Promise<string> {
+    if (ride.status !== 'ACCEPTED') {
+      return ride.status;
+    }
+    await runner.query(MOVE_TO_ARRIVED_SQL, [ride.id, ride.version]);
+    return 'ARRIVED';
+  }
+}
+
+function isActiveRideClash(error: unknown): boolean {
+  if (!(error instanceof QueryFailedError)) {
+    return false;
+  }
+  const driverError = error.driverError as { constraint?: string };
+  return driverError.constraint === ACTIVE_RIDE_INDEX;
 }
