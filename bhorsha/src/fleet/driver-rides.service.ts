@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   Injectable,
@@ -61,7 +62,6 @@ SELECT id
  LIMIT 1
    FOR SHARE`;
 
-
 const ACCEPT_RIDE_SQL = `
 UPDATE rides
    SET status = 'ACCEPTED', driver_id = $2, vehicle_id = $3, accepted_at = now()
@@ -85,6 +85,23 @@ const MOVE_TO_ARRIVED_SQL = `
 UPDATE rides
    SET status = 'ARRIVED'
  WHERE id = $1 AND status = 'ACCEPTED' AND version = $2`;
+
+const LOCK_PASSENGER_SQL = `
+SELECT id, status, arrived_at IS NOT NULL AS "hasArrived", pickup_pin = $3 AS "pinMatches"
+  FROM ride_passengers
+ WHERE id = $1 AND ride_id = $2
+   FOR UPDATE`;
+
+const PICK_UP_SQL = `
+UPDATE ride_passengers
+   SET status = 'PICKED_UP', picked_up_at = now()
+ WHERE id = $1 AND status = 'CONFIRMED' AND pickup_pin = $2
+RETURNING id AS "passengerId", status AS "passengerStatus", picked_up_at AS "pickedUpAt"`;
+
+const START_RIDE_SQL = `
+UPDATE rides
+   SET status = 'IN_PROGRESS', started_at = now()
+ WHERE id = $1 AND status = 'ARRIVED' AND version = $2`;
 
 interface OpenRideRow {
   rideId: number;
@@ -131,6 +148,21 @@ export interface Arrival {
   arrivedAt: Date;
 }
 
+interface LockedPassenger {
+  id: number;
+  status: string;
+  hasArrived: boolean;
+  pinMatches: boolean;
+}
+
+export interface Pickup {
+  rideId: number;
+  rideStatus: string;
+  passengerId: number;
+  passengerStatus: string;
+  pickedUpAt: Date;
+}
+
 @Injectable()
 export class DriverRidesService {
   constructor(
@@ -149,7 +181,9 @@ export class DriverRidesService {
       throw new ConflictException('Send your location first');
     }
 
-    const myVehicles = await this.vehicles.find({ where: { driverId: userId } });
+    const myVehicles = await this.vehicles.find({
+      where: { driverId: userId },
+    });
     const types = [...new Set(myVehicles.map((vehicle) => vehicle.type))];
     if (types.length === 0) {
       return [];
@@ -182,7 +216,11 @@ export class DriverRidesService {
       if (ride.status !== 'REQUESTED') {
         throw new ConflictException('Ride is no longer available');
       }
-      const vehicleId = await this.findVehicleFor(runner, userId, ride.vehicleType);
+      const vehicleId = await this.findVehicleFor(
+        runner,
+        userId,
+        ride.vehicleType,
+      );
       return this.markAccepted(runner, ride, userId, vehicleId);
     });
   }
@@ -191,14 +229,12 @@ export class DriverRidesService {
     await this.driversService.findMe(userId);
 
     return this.inTransaction(async (runner) => {
-      const ride = await this.lockRide(runner, rideId);
-      if (ride.driverId !== userId) {
-        throw new ForbiddenException('This ride belongs to another driver');
-      }
-      if (!PICKUP_STATUSES.includes(ride.status)) {
-        throw new ConflictException('This ride is not waiting for a pickup');
-      }
-      const result: QueryResult = await runner.query(MARK_ARRIVAL_SQL, [rideId], true);
+      const ride = await this.lockRideForPickup(runner, rideId, userId);
+      const result: QueryResult = await runner.query(
+        MARK_ARRIVAL_SQL,
+        [rideId],
+        true,
+      );
       if (result.records.length === 0) {
         throw new ConflictException('No passenger is waiting for a pickup');
       }
@@ -207,7 +243,36 @@ export class DriverRidesService {
     });
   }
 
-  private async inTransaction<T>(work: (runner: QueryRunner) => Promise<T>): Promise<T> {
+  async pickup(
+    userId: number,
+    rideId: number,
+    passengerId: number,
+    pin: string,
+  ): Promise<Pickup> {
+    await this.driversService.findMe(userId);
+
+    return this.inTransaction(async (runner) => {
+      const ride = await this.lockRideForPickup(runner, rideId, userId);
+      await this.checkPassenger(runner, rideId, passengerId, pin);
+      const result: QueryResult = await runner.query(
+        PICK_UP_SQL,
+        [passengerId, pin],
+        true,
+      );
+      if (result.records.length === 0) {
+        throw new ConflictException(
+          'This passenger is not waiting for a pickup',
+        );
+      }
+      const rideStatus = await this.startRide(runner, ride);
+      return { rideId, rideStatus, ...result.records[0] } as Pickup;
+    });
+  }
+
+
+  private async inTransaction<T>(
+    work: (runner: QueryRunner) => Promise<T>,
+  ): Promise<T> {
     const runner = this.dataSource.createQueryRunner();
     await runner.connect();
     await runner.startTransaction();
@@ -223,7 +288,10 @@ export class DriverRidesService {
     }
   }
 
-  private async lockRide(runner: QueryRunner, rideId: number): Promise<LockedRide> {
+  private async lockRide(
+    runner: QueryRunner,
+    rideId: number,
+  ): Promise<LockedRide> {
     const rows: LockedRide[] = await runner.query(LOCK_RIDE_SQL, [rideId]);
     if (rows.length === 0) {
       throw new NotFoundException(`Ride ${rideId} not found`);
@@ -231,14 +299,62 @@ export class DriverRidesService {
     return rows[0];
   }
 
+  private async lockRideForPickup(
+    runner: QueryRunner,
+    rideId: number,
+    userId: number,
+  ): Promise<LockedRide> {
+    const ride = await this.lockRide(runner, rideId);
+    if (ride.driverId !== userId) {
+      throw new ForbiddenException('This ride belongs to another driver');
+    }
+    if (!PICKUP_STATUSES.includes(ride.status)) {
+      throw new ConflictException('This ride is not waiting for a pickup');
+    }
+    return ride;
+  }
+
+  private async checkPassenger(
+    runner: QueryRunner,
+    rideId: number,
+    passengerId: number,
+    pin: string,
+  ): Promise<void> {
+    const rows: LockedPassenger[] = await runner.query(LOCK_PASSENGER_SQL, [
+      passengerId,
+      rideId,
+      pin,
+    ]);
+    if (rows.length === 0) {
+      throw new NotFoundException(
+        `Passenger ${passengerId} is not on ride ${rideId}`,
+      );
+    }
+    const passenger = rows[0];
+    if (passenger.status !== 'CONFIRMED') {
+      throw new ConflictException('This passenger is not waiting for a pickup');
+    }
+    if (!passenger.hasArrived) {
+      throw new ConflictException('Arrive at the pickup first');
+    }
+    if (!passenger.pinMatches) {
+      throw new BadRequestException('Wrong PIN');
+    }
+  }
+
   private async findVehicleFor(
     runner: QueryRunner,
     userId: number,
     vehicleType: string,
   ): Promise<number> {
-    const rows: { id: number }[] = await runner.query(FIND_VEHICLE_SQL, [userId, vehicleType]);
+    const rows: { id: number }[] = await runner.query(FIND_VEHICLE_SQL, [
+      userId,
+      vehicleType,
+    ]);
     if (rows.length === 0) {
-      throw new ConflictException(`You need an active ${vehicleType} for this ride`);
+      throw new ConflictException(
+        `You need an active ${vehicleType} for this ride`,
+      );
     }
     return rows[0].id;
   }
@@ -267,12 +383,26 @@ export class DriverRidesService {
     }
   }
 
-  private async moveToArrived(runner: QueryRunner, ride: LockedRide): Promise<string> {
+  private async moveToArrived(
+    runner: QueryRunner,
+    ride: LockedRide,
+  ): Promise<string> {
     if (ride.status !== 'ACCEPTED') {
       return ride.status;
     }
     await runner.query(MOVE_TO_ARRIVED_SQL, [ride.id, ride.version]);
     return 'ARRIVED';
+  }
+
+  private async startRide(
+    runner: QueryRunner,
+    ride: LockedRide,
+  ): Promise<string> {
+    if (ride.status !== 'ARRIVED') {
+      return ride.status;
+    }
+    await runner.query(START_RIDE_SQL, [ride.id, ride.version]);
+    return 'IN_PROGRESS';
   }
 }
 

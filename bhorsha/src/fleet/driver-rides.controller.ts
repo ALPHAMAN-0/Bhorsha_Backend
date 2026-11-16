@@ -1,4 +1,5 @@
 import {
+  Body,
   Controller,
   Get,
   HttpCode,
@@ -9,6 +10,7 @@ import {
 } from '@nestjs/common';
 import { CurrentUserId } from '../common/decorators/current-user-id.decorator.js';
 import { DriverRidesService } from './driver-rides.service.js';
+import { PickupDto } from './dto/pickup.dto.js';
 
 @Controller('rides')
 export class DriverRidesController {
@@ -35,5 +37,16 @@ export class DriverRidesController {
     @Param('id', ParseIntPipe) rideId: number,
   ) {
     return this.driverRidesService.arrive(userId, rideId);
+  }
+
+  @Post(':id/passengers/:pid/pickup')
+  @HttpCode(HttpStatus.OK)
+  pickup(
+    @CurrentUserId() userId: number,
+    @Param('id', ParseIntPipe) rideId: number,
+    @Param('pid', ParseIntPipe) passengerId: number,
+    @Body() dto: PickupDto,
+  ) {
+    return this.driverRidesService.pickup(userId, rideId, passengerId, dto.pin);
   }
 }
