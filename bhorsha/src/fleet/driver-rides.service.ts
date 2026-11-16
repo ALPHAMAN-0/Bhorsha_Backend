@@ -103,6 +103,26 @@ UPDATE rides
    SET status = 'IN_PROGRESS', started_at = now()
  WHERE id = $1 AND status = 'ARRIVED' AND version = $2`;
 
+const DROP_OFF_SQL = `
+UPDATE ride_passengers
+   SET status = 'DROPPED', dropped_at = now()
+ WHERE id = $1 AND status = 'PICKED_UP'
+RETURNING id AS "passengerId", status AS "passengerStatus", seats,
+          locked_fare_paisa AS "farePaisa", dropped_at AS "droppedAt"`;
+
+const COUNT_LIVE_PASSENGERS_SQL = `
+SELECT count(*)::int AS "live"
+  FROM ride_passengers
+ WHERE ride_id = $1 AND status IN ('CONFIRMED', 'PICKED_UP')`;
+
+const FINISH_DROP_OFF_SQL = `
+UPDATE rides
+   SET seats_free   = CASE WHEN is_shared THEN seats_free + $3 ELSE seats_free END,
+       status       = CASE WHEN $4::boolean THEN 'COMPLETED'::ride_status ELSE status END,
+       completed_at = CASE WHEN $4::boolean THEN now() ELSE completed_at END
+ WHERE id = $1 AND status = 'IN_PROGRESS' AND version = $2
+RETURNING status AS "rideStatus", seats_free AS "seatsFree"`;
+
 interface OpenRideRow {
   rideId: number;
   vehicleType: string;
@@ -161,6 +181,29 @@ export interface Pickup {
   passengerId: number;
   passengerStatus: string;
   pickedUpAt: Date;
+}
+
+interface DroppedPassenger {
+  passengerId: number;
+  passengerStatus: string;
+  seats: number;
+  farePaisa: string;
+  droppedAt: Date;
+}
+
+interface RideAfterDropOff {
+  rideStatus: string;
+  seatsFree: number;
+}
+
+export interface DropOff {
+  rideId: number;
+  rideStatus: string;
+  seatsFree: number;
+  passengerId: number;
+  passengerStatus: string;
+  farePaisa: number;
+  droppedAt: Date;
 }
 
 @Injectable()
@@ -269,6 +312,34 @@ export class DriverRidesService {
     });
   }
 
+  async dropoff(
+    userId: number,
+    rideId: number,
+    passengerId: number,
+  ): Promise<DropOff> {
+    await this.driversService.findMe(userId);
+
+    return this.inTransaction(async (runner) => {
+      const ride = await this.lockOwnRide(runner, rideId, userId);
+      if (ride.status !== 'IN_PROGRESS') {
+        throw new ConflictException('This ride is not in progress');
+      }
+      const passenger = await this.lockPassenger(runner, rideId, passengerId);
+      if (passenger.status !== 'PICKED_UP') {
+        throw new ConflictException('This passenger is not on board');
+      }
+      const dropped = await this.dropPassenger(runner, passengerId);
+      const rideAfter = await this.finishDropOff(runner, ride, dropped.seats);
+      return {
+        rideId,
+        ...rideAfter,
+        passengerId: dropped.passengerId,
+        passengerStatus: dropped.passengerStatus,
+        farePaisa: Number(dropped.farePaisa),
+        droppedAt: dropped.droppedAt,
+      };
+    });
+  }
 
   private async inTransaction<T>(
     work: (runner: QueryRunner) => Promise<T>,
@@ -299,7 +370,7 @@ export class DriverRidesService {
     return rows[0];
   }
 
-  private async lockRideForPickup(
+  private async lockOwnRide(
     runner: QueryRunner,
     rideId: number,
     userId: number,
@@ -308,18 +379,27 @@ export class DriverRidesService {
     if (ride.driverId !== userId) {
       throw new ForbiddenException('This ride belongs to another driver');
     }
+    return ride;
+  }
+
+  private async lockRideForPickup(
+    runner: QueryRunner,
+    rideId: number,
+    userId: number,
+  ): Promise<LockedRide> {
+    const ride = await this.lockOwnRide(runner, rideId, userId);
     if (!PICKUP_STATUSES.includes(ride.status)) {
       throw new ConflictException('This ride is not waiting for a pickup');
     }
     return ride;
   }
 
-  private async checkPassenger(
+  private async lockPassenger(
     runner: QueryRunner,
     rideId: number,
     passengerId: number,
-    pin: string,
-  ): Promise<void> {
+    pin: string | null = null,
+  ): Promise<LockedPassenger> {
     const rows: LockedPassenger[] = await runner.query(LOCK_PASSENGER_SQL, [
       passengerId,
       rideId,
@@ -330,7 +410,21 @@ export class DriverRidesService {
         `Passenger ${passengerId} is not on ride ${rideId}`,
       );
     }
-    const passenger = rows[0];
+    return rows[0];
+  }
+
+  private async checkPassenger(
+    runner: QueryRunner,
+    rideId: number,
+    passengerId: number,
+    pin: string,
+  ): Promise<void> {
+    const passenger = await this.lockPassenger(
+      runner,
+      rideId,
+      passengerId,
+      pin,
+    );
     if (passenger.status !== 'CONFIRMED') {
       throw new ConflictException('This passenger is not waiting for a pickup');
     }
@@ -403,6 +497,42 @@ export class DriverRidesService {
     }
     await runner.query(START_RIDE_SQL, [ride.id, ride.version]);
     return 'IN_PROGRESS';
+  }
+
+  private async dropPassenger(
+    runner: QueryRunner,
+    passengerId: number,
+  ): Promise<DroppedPassenger> {
+    const result: QueryResult<DroppedPassenger> = await runner.query(
+      DROP_OFF_SQL,
+      [passengerId],
+      true,
+    );
+    if (result.records.length === 0) {
+      throw new ConflictException('This passenger is not on board');
+    }
+    return result.records[0];
+  }
+
+  private async finishDropOff(
+    runner: QueryRunner,
+    ride: LockedRide,
+    seats: number,
+  ): Promise<RideAfterDropOff> {
+    const rows: { live: number }[] = await runner.query(
+      COUNT_LIVE_PASSENGERS_SQL,
+      [ride.id],
+    );
+    const isLastPassenger = rows[0].live === 0;
+    const result: QueryResult<RideAfterDropOff> = await runner.query(
+      FINISH_DROP_OFF_SQL,
+      [ride.id, ride.version, seats, isLastPassenger],
+      true,
+    );
+    if (result.records.length === 0) {
+      throw new ConflictException('This ride is not in progress');
+    }
+    return result.records[0];
   }
 }
 

@@ -49,4 +49,14 @@ export class DriverRidesController {
   ) {
     return this.driverRidesService.pickup(userId, rideId, passengerId, dto.pin);
   }
+
+  @Post(':id/passengers/:pid/dropoff')
+  @HttpCode(HttpStatus.OK)
+  dropoff(
+    @CurrentUserId() userId: number,
+    @Param('id', ParseIntPipe) rideId: number,
+    @Param('pid', ParseIntPipe) passengerId: number,
+  ) {
+    return this.driverRidesService.dropoff(userId, rideId, passengerId);
+  }
 }
