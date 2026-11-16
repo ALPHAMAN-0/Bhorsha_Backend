@@ -32,7 +32,8 @@ SELECT status
 const FIND_VEHICLE_SQL = `
 SELECT id, driver_id AS "driverId", type, seats
   FROM vehicles
- WHERE id = $1 AND deleted_at IS NULL`;
+ WHERE id = $1 AND deleted_at IS NULL
+   FOR SHARE`;
 
 const FIND_LIVE_OFFER_SQL = `
 SELECT id

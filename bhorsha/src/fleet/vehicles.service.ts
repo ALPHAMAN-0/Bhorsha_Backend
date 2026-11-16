@@ -5,13 +5,32 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { EntityManager, Repository } from 'typeorm';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto.js';
 import { CreateVehicleDto } from './dto/create-vehicle.dto.js';
 import { UpdateVehicleDto } from './dto/update-vehicle.dto.js';
 import { DriverProfile } from './entities/driver-profile.entity.js';
 import { Vehicle } from './entities/vehicle.entity.js';
 import { SEAT_CAPACITY } from './vehicle-type.js';
+
+const ACTIVE_RIDE_STATUSES = [
+  'ACCEPTED',
+  'ARRIVED',
+  'IN_PROGRESS',
+  'AWAITING_HANDOVER',
+];
+
+const ACTIVE_RIDE_FOR_VEHICLE_SQL = `
+SELECT id
+  FROM rides
+ WHERE vehicle_id = $1 AND status = ANY ($2::ride_status[])
+ LIMIT 1`;
+
+const LIVE_OFFER_FOR_VEHICLE_SQL = `
+SELECT id
+  FROM route_offers
+ WHERE vehicle_id = $1 AND status = 'OPEN' AND expires_at > now()
+ LIMIT 1`;
 
 @Injectable()
 export class VehiclesService {
@@ -62,8 +81,35 @@ export class VehiclesService {
   }
 
   async remove(userId: number, id: number): Promise<void> {
-    const vehicle = await this.findOwned(userId, id);
-    await this.vehicles.softDelete(vehicle.id);
+    await this.vehicles.manager.transaction(async (manager) => {
+      const vehicle = await this.findOwned(userId, id, manager, true);
+      await this.assertNotInUse(manager, vehicle.id);
+      await manager.softDelete(Vehicle, vehicle.id);
+    });
+  }
+
+  private async assertNotInUse(
+    manager: EntityManager,
+    vehicleId: number,
+  ): Promise<void> {
+    const rides: { id: number }[] = await manager.query(
+      ACTIVE_RIDE_FOR_VEHICLE_SQL,
+      [vehicleId, ACTIVE_RIDE_STATUSES],
+    );
+    if (rides.length > 0) {
+      throw new ConflictException(
+        `This vehicle is on active ride ${rides[0].id}`,
+      );
+    }
+    const offers: { id: number }[] = await manager.query(
+      LIVE_OFFER_FOR_VEHICLE_SQL,
+      [vehicleId],
+    );
+    if (offers.length > 0) {
+      throw new ConflictException(
+        `This vehicle has an open route offer (id ${offers[0].id})`,
+      );
+    }
   }
 
   private async assertIsDriver(userId: number): Promise<void> {
@@ -82,8 +128,16 @@ export class VehiclesService {
     }
   }
 
-  private async findOwned(userId: number, id: number): Promise<Vehicle> {
-    const vehicle = await this.vehicles.findOne({ where: { id } });
+  private async findOwned(
+    userId: number,
+    id: number,
+    manager: EntityManager = this.vehicles.manager,
+    forUpdate = false,
+  ): Promise<Vehicle> {
+    const vehicle = await manager.findOne(Vehicle, {
+      where: { id },
+      lock: forUpdate ? { mode: 'pessimistic_write' } : undefined,
+    });
     if (!vehicle) {
       throw new NotFoundException(`Vehicle ${id} not found`);
     }
