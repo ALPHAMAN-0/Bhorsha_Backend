@@ -10,6 +10,8 @@ import { DriverProfile } from '../../fleet/entities/driver-profile.entity.js';
 import { User } from '../../users/entities/user.entity.js';
 import { AuthController } from './auth.controller.js';
 import { AuthService } from './auth.service.js';
+import { DriverVerificationController } from './driver-verification.controller.js';
+import { DriverVerificationService } from './driver-verification.service.js';
 import { JwtStrategy } from './jwt.strategy.js';
 import { PasswordService } from './password.service.js';
 import { UsersController } from './users.controller.js';
@@ -33,11 +35,12 @@ import { UsersService } from './users.service.js';
       }),
     }),
   ],
-  controllers: [AuthController, UsersController],
+  controllers: [AuthController, UsersController, DriverVerificationController],
   providers: [
     AuthService,
     PasswordService,
     UsersService,
+    DriverVerificationService,
     JwtStrategy,
     // Global guards run in this order: first who you are, then what you may do.
     { provide: APP_GUARD, useClass: JwtAuthGuard },
