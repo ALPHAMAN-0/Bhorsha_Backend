@@ -6,6 +6,8 @@ import { DriversController } from './drivers.controller.js';
 import { DriversService } from './drivers.service.js';
 import { DriverProfile } from './entities/driver-profile.entity.js';
 import { Vehicle } from './entities/vehicle.entity.js';
+import { RideInvitesController } from './ride-invites.controller.js';
+import { RideInvitesService } from './ride-invites.service.js';
 import { RouteOffersController } from './route-offers.controller.js';
 import { RouteOffersService } from './route-offers.service.js';
 import { VehiclesController } from './vehicles.controller.js';
@@ -18,12 +20,14 @@ import { VehiclesService } from './vehicles.service.js';
     DriversController,
     DriverRidesController,
     RouteOffersController,
+    RideInvitesController,
   ],
   providers: [
     VehiclesService,
     DriversService,
     DriverRidesService,
     RouteOffersService,
+    RideInvitesService,
   ],
 })
 export class FleetModule {}
