@@ -29,5 +29,14 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
 
+  mailpit:
+    # Mailpit mock SMTP server for local emergency SOS email testing (Web UI: http://localhost:8025)
+    image: axllent/mailpit:latest
+    container_name: bhorsha-mailpit
+    restart: unless-stopped
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+
 volumes:
   pgdata:

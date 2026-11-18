@@ -3,19 +3,24 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
+import { validateEnv } from './config/env.validation.js';
 import { FleetModule } from './fleet/fleet.module.js';
+import { NotifyModule } from './notify/notify.module.js';
+import { PricingModule } from './pricing/pricing.module.js';
+import { SafetyModule } from './safety/safety.module.js';
+import { TripsModule } from './trips/trips.module.js';
 import { UsersModule } from './users/users.module.js';
 import { IdentityModule } from './modules/identity/identity.module.js';
-import { PricingModule } from './modules/pricing/pricing.module.js';
-import { TripsModule } from './modules/trips/trips.module.js';
 import { SharingModule } from './modules/sharing/sharing.module.js';
 import { TrustModule } from './modules/trust/trust.module.js';
-import { NotifyModule } from './modules/notify/notify.module.js';
 import { AuditModule } from './modules/audit/audit.module.js';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }), // reads bhorsha/.env
+    ConfigModule.forRoot({
+      isGlobal: true, // reads bhorsha/.env
+      validate: validateEnv,
+    }),
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
@@ -23,7 +28,7 @@ import { AuditModule } from './modules/audit/audit.module.js';
         host: config.getOrThrow<string>('DB_HOST'),
         port: Number(config.getOrThrow<string>('DB_PORT')),
         username: config.getOrThrow<string>('DB_USER'),
-        password: config.getOrThrow<string>('DB_PASSWORD'),
+        password: config.get<string>('DB_PASSWORD') || '',
         database: config.getOrThrow<string>('DB_NAME'),
         autoLoadEntities: true,
         synchronize: false, // the Docker image already creates the tables
@@ -32,14 +37,17 @@ import { AuditModule } from './modules/audit/audit.module.js';
         extra: { max: Number(config.get('DB_POOL_MAX', 10)) },
       }),
     }),
+    // FleetModule must stay before TripsModule: GET /rides/open has to be
+    // registered before GET /rides/:id, or ":id" would catch "open".
     UsersModule,
     FleetModule,
-    IdentityModule,
+    NotifyModule,
     PricingModule,
+    SafetyModule,
     TripsModule,
+    IdentityModule,
     SharingModule,
     TrustModule,
-    NotifyModule,
     AuditModule,
   ],
   controllers: [AppController],
