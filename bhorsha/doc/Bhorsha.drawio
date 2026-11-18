@@ -1,6 +1,6 @@
 <mxfile host="app.diagrams.net">
   <diagram id="7-VoqUSIIZZoscxCboAb" name="Page-1">
-    <mxGraphModel dx="5289" dy="3247" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="0" pageScale="1" pageWidth="4415" pageHeight="3202" math="0" shadow="0">
+    <mxGraphModel dx="4985" dy="3065" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="0" pageScale="1" pageWidth="4415" pageHeight="3202" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
@@ -856,55 +856,55 @@
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
         <mxCell id="v285" parent="1" style="rounded=1;arcSize=4;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#999999;" value="" vertex="1">
-          <mxGeometry height="400" width="430" x="4163" y="1948" as="geometry" />
+          <mxGeometry height="400" width="430" x="2677" y="701" as="geometry" />
         </mxCell>
         <mxCell id="v286" parent="1" style="text;html=1;fontSize=16;fontStyle=1;align=left;" value="Legend" vertex="1">
-          <mxGeometry height="30" width="200" x="4183" y="1958" as="geometry" />
+          <mxGeometry height="30" width="200" x="2697" y="711" as="geometry" />
         </mxCell>
         <mxCell id="v287" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;fontSize=12;strokeWidth=2;" value="Entity" vertex="1">
-          <mxGeometry height="36" width="110" x="4193" y="2000" as="geometry" />
+          <mxGeometry height="36" width="110" x="2707" y="753" as="geometry" />
         </mxCell>
         <mxCell id="v288" parent="1" style="text;html=1;fontSize=13;align=left;verticalAlign=middle;whiteSpace=wrap;" value="Entity" vertex="1">
-          <mxGeometry height="40" width="250" x="4323" y="1998" as="geometry" />
+          <mxGeometry height="40" width="250" x="2837" y="751" as="geometry" />
         </mxCell>
         <mxCell id="v289" parent="1" style="shape=associativeEntity;whiteSpace=wrap;html=1;align=center;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;fontSize=11;strokeWidth=2;" value="Assoc." vertex="1">
-          <mxGeometry height="40" width="110" x="4193" y="2046" as="geometry" />
+          <mxGeometry height="40" width="110" x="2707" y="799" as="geometry" />
         </mxCell>
         <mxCell id="v290" parent="1" style="text;html=1;fontSize=13;align=left;verticalAlign=middle;whiteSpace=wrap;" value="Associative entity (M:N with its own attributes)" vertex="1">
-          <mxGeometry height="40" width="250" x="4323" y="2046" as="geometry" />
+          <mxGeometry height="40" width="250" x="2837" y="799" as="geometry" />
         </mxCell>
         <mxCell id="v291" parent="1" style="shape=rhombus;perimeter=rhombusPerimeter;whiteSpace=wrap;html=1;align=center;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;fontStyle=1;strokeWidth=1.5;" value="Rel." vertex="1">
-          <mxGeometry height="44" width="110" x="4193" y="2092" as="geometry" />
+          <mxGeometry height="44" width="110" x="2707" y="845" as="geometry" />
         </mxCell>
         <mxCell id="v292" parent="1" style="text;html=1;fontSize=13;align=left;verticalAlign=middle;whiteSpace=wrap;" value="Relationship" vertex="1">
-          <mxGeometry height="40" width="250" x="4323" y="2094" as="geometry" />
+          <mxGeometry height="40" width="250" x="2837" y="847" as="geometry" />
         </mxCell>
         <mxCell id="v293" parent="1" style="ellipse;whiteSpace=wrap;html=1;align=center;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=13;" value="Attribute" vertex="1">
-          <mxGeometry height="34" width="110" x="4193" y="2145" as="geometry" />
+          <mxGeometry height="34" width="110" x="2707" y="898" as="geometry" />
         </mxCell>
         <mxCell id="v294" parent="1" style="text;html=1;fontSize=13;align=left;verticalAlign=middle;whiteSpace=wrap;" value="Attribute" vertex="1">
-          <mxGeometry height="40" width="250" x="4323" y="2142" as="geometry" />
+          <mxGeometry height="40" width="250" x="2837" y="895" as="geometry" />
         </mxCell>
         <mxCell id="v295" parent="1" style="ellipse;whiteSpace=wrap;html=1;align=center;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=13;fontStyle=4;" value="Key" vertex="1">
-          <mxGeometry height="34" width="110" x="4193" y="2193" as="geometry" />
+          <mxGeometry height="34" width="110" x="2707" y="946" as="geometry" />
         </mxCell>
         <mxCell id="v296" parent="1" style="text;html=1;fontSize=13;align=left;verticalAlign=middle;whiteSpace=wrap;" value="Key attribute (primary key)" vertex="1">
-          <mxGeometry height="40" width="250" x="4323" y="2190" as="geometry" />
+          <mxGeometry height="40" width="250" x="2837" y="943" as="geometry" />
         </mxCell>
         <mxCell id="v297" parent="1" style="ellipse;whiteSpace=wrap;html=1;align=center;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=13;dashed=1;dashPattern=6 4;" value="Derived" vertex="1">
-          <mxGeometry height="34" width="110" x="4193" y="2241" as="geometry" />
+          <mxGeometry height="34" width="110" x="2707" y="994" as="geometry" />
         </mxCell>
         <mxCell id="v298" parent="1" style="text;html=1;fontSize=13;align=left;verticalAlign=middle;whiteSpace=wrap;" value="Derived attribute" vertex="1">
-          <mxGeometry height="40" width="250" x="4323" y="2238" as="geometry" />
+          <mxGeometry height="40" width="250" x="2837" y="991" as="geometry" />
         </mxCell>
         <mxCell id="v299" parent="1" style="ellipse;whiteSpace=wrap;html=1;align=center;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=13;" value="Composite" vertex="1">
-          <mxGeometry height="34" width="110" x="4193" y="2289" as="geometry" />
+          <mxGeometry height="34" width="110" x="2707" y="1042" as="geometry" />
         </mxCell>
         <mxCell id="v300" parent="1" style="text;html=1;fontSize=13;align=left;verticalAlign=middle;whiteSpace=wrap;" value="Composite attribute: ellipse with sub-ellipses" vertex="1">
-          <mxGeometry height="40" width="250" x="4323" y="2286" as="geometry" />
+          <mxGeometry height="40" width="250" x="2837" y="1039" as="geometry" />
         </mxCell>
         <mxCell id="v301" parent="1" style="text;html=1;fontSize=13;align=left;verticalAlign=middle;whiteSpace=wrap;" value="1, N, M on a line = cardinality of that entity in the relationship" vertex="1">
-          <mxGeometry height="40" width="390" x="4183" y="2334" as="geometry" />
+          <mxGeometry height="40" width="390" x="2697" y="1087" as="geometry" />
         </mxCell>
       </root>
     </mxGraphModel>
