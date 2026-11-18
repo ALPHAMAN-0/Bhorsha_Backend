@@ -2,6 +2,7 @@ import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module.js';
+import { validationExceptionFactory } from './common/filters/validation-exception.factory.js';
 import { TimingInterceptor } from './common/interceptors/timing.interceptor.js';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor.js';
 
@@ -15,6 +16,7 @@ async function bootstrap() {
       whitelist: true,
       forbidNonWhitelisted: true,
       transform: true,
+      exceptionFactory: validationExceptionFactory,
     }),
   );
   app.useGlobalInterceptors(
