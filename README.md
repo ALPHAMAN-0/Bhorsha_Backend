@@ -376,61 +376,59 @@ bhorsha/
 
 ### In this repo
 
-The course release is backend only (§26), so this repository holds just the `apps/api` part, as one NestJS app in `bhorsha/`. Inside `src/` it uses the document's layout. The driver, rider and ops apps, `packages/` and `infra/` are out of scope, so they don't exist here.
+The course release is backend only (§26), so this repository holds just the `apps/api` part, as one NestJS app in `bhorsha/`. The driver, rider and ops apps, `packages/` and `infra/` are out of scope, so they don't exist here. How to run the API, every endpoint and how login works are in [bhorsha/README.md](bhorsha/README.md).
 
 ```text
 Bhorsha_Backend/
 ├── README.md                    this file (Architecture v3.1)
 └── bhorsha/                     NestJS 12 API: "apps/api" in the tree above
+    ├── README.md                how to run, configure and extend the API
     ├── src/
-    │   ├── main.ts              bootstrap: ValidationPipe, the /api/v1 prefix and Swagger go here
-    │   ├── app.module.ts        ConfigModule + TypeORM (synchronize off)
-    │   ├── app.controller.ts    Nest starter route (GET /)
-    │   ├── common/
-    │   │   ├── decorators/      @Public(), @Roles(), @CurrentUser()
-    │   │   ├── filters/         global exception filter: one error shape
-    │   │   ├── guards/          JwtAuthGuard, RolesGuard
-    │   │   ├── interceptors/    timing, response envelope, audit
-    │   │   └── middleware/      request logging and the request ID
-    │   ├── config/              env loading and validation
-    │   ├── database/            data-source.ts (TypeORM CLI), migrations/
+    │   ├── main.ts              /api/v1 prefix, ValidationPipe, interceptors, Swagger
+    │   ├── app.module.ts        config, TypeORM (synchronize off), every module, the global filter
+    │   ├── common/              decorators, guards, exception filter, interceptors, pagination
+    │   ├── config/              env validation
+    │   ├── users/               User entity
+    │   ├── fleet/               driver profiles, vehicles, the driver's ride steps, route offers, invites
+    │   ├── trips/               rides, passengers, join requests, ratings
+    │   ├── pricing/             the fare quote
+    │   ├── safety/              SOS
+    │   ├── notify/              SOS email (caught by Mailpit)
     │   └── modules/
-    │       ├── identity/        auth and users
-    │       ├── fleet/           driver profiles and vehicles
-    │       ├── pricing/         fare rules and the fare quote
-    │       ├── trips/           rides, passengers, ratings, SOS
-    │       ├── sharing/         route offers, invites, join requests, seat transaction
+    │       ├── identity/        auth, users, driver verification
+    │       ├── pricing/         fare rules
     │       ├── trust/           cases, strikes, appeals
-    │       ├── notify/          mailer (SOS email, caught by Mailpit)
-    │       └── audit/           audit-log reads
+    │       └── audit/           audit logs
     ├── test/                    end-to-end tests (Vitest + Supertest)
-    ├── doc/                     databaseSQL.md (database reference), setup photos
-    ├── docker-compose.yml       PostgreSQL 16 from Docker Hub (siam001/bhorsha-db:2.0.0)
-    ├── env.example              copy to .env
+    ├── doc/                     databaseSQL.md (database reference), draw.io diagrams, setup photos
+    ├── docker-compose.yml       PostgreSQL 16 (siam001/bhorsha-db:2.0.0) and Mailpit
+    ├── .env.example             copy to .env
     └── package.json             scripts (pnpm)
 ```
 
-Only the course-release modules exist. Location, dispatch, ledger, geo and safety are out of scope: driver location is two columns on `driver_profiles`, drivers pull open requests instead of receiving dispatch offers, and SOS is an email.
+The admin and support code uses the document's layout (`src/modules/<module>`). The driver and rider code is still in top-level folders under `src/`. `src/modules/fleet`, `trips`, `sharing` and `notify` hold only empty placeholder classes that nothing imports.
 
-Each module keeps its own entities, DTOs, controllers and services, for example `modules/fleet/entities/vehicle.entity.ts`, and registers its entities with `TypeOrmModule.forFeature()`. Folders without code yet hold an empty `.gitkeep`.
+Only the course-release modules exist. Location, dispatch, ledger and geo are out of scope: driver location is two columns on `driver_profiles`, drivers pull open requests instead of receiving dispatch offers, and SOS is an email.
 
-**Who builds what** (from the [§26 work plan](#work-plan)):
+Each module keeps its own entities, DTOs, controllers and services and registers its entities with `TypeOrmModule.forFeature()`.
+
+**Who built what** (from the [§26 work plan](#work-plan)):
 
 | Folder in `bhorsha/src/` | Tables | Built by |
 |---|---|---|
-| `modules/identity/` | users | Roshni: the users table (project setup). Siam: register, login, users CRUD |
-| `modules/fleet/` | driver_profiles, vehicles | Roshni: both tables, own profile, status, location, vehicles CRUD. Siam: driver list and verification |
-| `modules/pricing/` | fare_rules | Siam: fare rules. Numman: the fare quote |
-| `modules/trips/` | rides, ride_passengers, ratings | Numman: the tables, booking, own and all rides, cancel, ratings, SOS. Roshni: open requests, accept, arrive, pickup, drop-off |
-| `modules/sharing/` | route_offers, join_requests | Roshni: the route_offers table, route offers, invites. Numman: the join_requests table, nearby offers, join requests, accept and decline (seat transaction) |
-| `modules/trust/` | support_cases, strikes, appeals | Anyka: the tables, cases, strikes, appeals |
-| `modules/audit/` | audit_logs | Anyka: the table and its reads |
-| `modules/notify/` | — | Numman: the mailer |
+| `users/`, `modules/identity/` | users, driver_profiles | Roshni: the users table (project setup). Siam: register, login, users CRUD, driver list and verification |
+| `fleet/` | driver_profiles, vehicles, rides, route_offers | Roshni: own profile, status, location, vehicles CRUD, open requests, accept, arrive, pickup, drop-off, route offers, invites |
+| `modules/pricing/` | fare_rules | Siam: fare rules |
+| `pricing/` | fare_rules | Numman: the fare quote |
+| `trips/` | rides, ride_passengers, join_requests, ratings | Numman: booking, own and all rides, cancel, nearby offers, join requests, accept and decline (seat transaction), ratings |
+| `safety/`, `notify/` | — | Numman: SOS and the mailer |
+| `modules/trust/` | support_cases, strikes, appeals | Anyka: cases, strikes, appeals |
+| `modules/audit/` | audit_logs | Anyka: the audit-log reads |
 | `common/decorators/`, `common/guards/`, `common/filters/` | — | Siam |
-| `common/interceptors/` | — | Roshni: timing and the response envelope. Anyka: the audit interceptor |
-| `common/middleware/` | — | Anyka: request logging and the request ID |
+| `common/interceptors/`, `common/dto/` | — | Roshni: timing, the response envelope, pagination. Anyka: the audit interceptor (not built yet) |
+| `common/middleware/` | — | Anyka: request logging and the request ID (not built yet) |
 | `config/` | — | Numman: env validation |
-| `database/` | — | Siam: `data-source.ts` and migrations |
+| `database/` | — | Siam: `data-source.ts` and migrations (not built yet) |
 
 ## 10. Real-Time Layer
 
@@ -697,18 +695,19 @@ Node.js (active LTS) · pnpm · Docker with Compose
 git clone https://github.com/ALPHAMAN-0/Bhorsha_Backend.git
 cd Bhorsha_Backend/bhorsha
 pnpm install
-cp env.example .env        # Windows: copy env.example .env
-docker compose up -d       # PostgreSQL 16 with the 13 tables and demo data
+cp .env.example .env       # Windows: copy .env.example .env
+openssl rand -base64 32    # put the result in .env as JWT_ACCESS_SECRET
+docker compose up -d       # PostgreSQL 16 with the 13 tables and demo data, plus Mailpit
 pnpm start:dev             # the API on http://localhost:3000
 ```
 
-Wait until `docker compose ps` shows `bhorsha-db` as `(healthy)` before you start the API. If your machine ran the older v1 database image, run `docker compose down -v` once first, because the tables are created only when the data volume is empty.
+Wait until `docker compose ps` shows `bhorsha-db` as `(healthy)` before you start the API. If your machine ran the older v1 database image, run `docker compose down -v` once first, because the tables are created only when the data volume is empty. Step-by-step setup, the Windows commands and fixes for common errors are in [bhorsha/README.md](bhorsha/README.md#quick-start).
 
 | What | Where |
 |---|---|
-| API | http://localhost:3000/api/v1 once the project setup adds the prefix. Until then the starter route `GET /` at http://localhost:3000 answers `Hello World!` |
-| Swagger | http://localhost:3000/api/docs, added with the Swagger task |
-| Mailpit | http://localhost:8025, added with the mailer |
+| API | http://localhost:3000/api/v1 |
+| Swagger | http://localhost:3000/api/docs. Log in with `POST /auth/login`, then press **Authorize** and paste the `accessToken` |
+| Mailpit | http://localhost:8025 (SOS emails) |
 | Database | `localhost:5433`, database `bhorsha`, user `bhorsha`, password from `.env` ([DBeaver guide](bhorsha/doc/Photos/Database%20Connection%20On%20Docker%20and%20DBeaver/Approach.md)) |
 
 **Demo accounts.** They come with the database image. Every password is `Bhorsha@123`, and you log in with the phone number.
@@ -784,18 +783,23 @@ These are validated at boot with Joi; the API refuses to start on invalid config
 | `SMTP_URL` | Email |
 | `OTEL_EXPORTER_OTLP_ENDPOINT`, `SENTRY_DSN` | Observability |
 
-> **In this repo:** `bhorsha/env.example` holds the database settings so far:
+> **In this repo:** `bhorsha/.env.example` holds every setting the course release uses, with working local values. Copy it to `.env` and set your own `JWT_ACCESS_SECRET`. The API checks the database settings at start-up (a custom validator instead of Joi) and refuses to start without them.
 >
 > | Variable | Purpose |
 > |---|---|
 > | `PORT` | API port (3000) |
 > | `DB_IMAGE` | Database image and version (`siam001/bhorsha-db:2.0.0`) |
-> | `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD` | Database name and login, shared by the container and the app |
-> | `DB_HOST`, `DB_PORT` | Where the app finds the database (`localhost:5433`) |
+> | `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD` | Database that `docker compose` creates |
+> | `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME` | How the API reaches the database (`localhost:5433`) |
 > | `DB_POOL_MAX`, `DB_LOGGING` | Connection pool size; SQL logging |
-> | `DATABASE_URL` | The same connection as one URL, for tools such as DBeaver |
+> | `DATABASE_URL` | The same connection as one URL, for tools such as DBeaver (the API doesn't read it) |
+> | `NODE_ENV` | `production` turns off the development `x-user-id` fallback |
+> | `JWT_ACCESS_SECRET`, `JWT_ACCESS_TTL` | Signs access tokens; they last 15 minutes |
+> | `BCRYPT_ROUNDS` | Password hashing cost (12) |
+> | `ALLOW_X_USER_ID` | Development only: lets a request without a token use the `x-user-id` header. Keep `false` for the demo |
+> | `MAIL_HOST`, `MAIL_PORT`, `MAIL_FROM` | SMTP for SOS emails (Mailpit on port 1025), in place of `SMTP_URL` |
 >
-> From the document's table, the course release still needs `NODE_ENV`, `JWT_ACCESS_SECRET`, `JWT_ACCESS_TTL`, `BCRYPT_ROUNDS` and `SMTP_URL`. They go into `env.example` when login and the mailer are built. The other variables belong to services that are out of scope.
+> Refresh tokens are future work (§26), so there is no `JWT_REFRESH_*`. The other variables in the table above belong to services that are out of scope. [bhorsha/README.md](bhorsha/README.md#environment-variables) explains each value.
 
 ### Scripts
 
@@ -817,7 +821,8 @@ These are validated at boot with Joi; the API refuses to start on invalid config
 > | `pnpm lint` | oxlint (type-aware) on `src/` and `test/` |
 > | `pnpm format` | Prettier on `src/` and `test/` |
 > | `pnpm test` | Unit tests (`*.spec.ts`, Vitest) |
-> | `pnpm test:e2e` | End-to-end tests (`test/*.e2e-spec.ts`, Supertest) |
+> | `pnpm test:e2e` | End-to-end tests (`test/*.e2e-spec.ts`, Supertest); need the database |
+> | `pnpm test:concurrency` | The load test: 50 parallel requests for the last seat |
 > | `pnpm test:cov` | Unit tests with coverage |
 >
 > `migration:generate` and `migration:run` are added with the migrations task.
@@ -835,7 +840,7 @@ These are validated at boot with Joi; the API refuses to start on invalid config
   - Alerts exist for any new critical path.
   - New endpoints have DTOs and Swagger examples.
 
-> **In this repo:** each member works on their own branch (`SiamHossain`, `SumaiyaAkterRoshni`, `Md_Numman`, `Anyka_Akter_Ayna`) and merges into `main` through a pull request that another member approved. The Definition of Done card on the [Trello board](https://trello.com/b/lfLer4JD/bhorsha) is the course version of the list above.
+> **In this repo:** each member works on their own branch (`SiamHossain`, `SumaiyaAkterRoshni`, `Md_Numman`, `feature/anyka-support`), merges `main` into it before starting new work, and merges into `main` through a pull request that another member approved. The Definition of Done card on the [Trello board](https://trello.com/b/lfLer4JD/bhorsha) is the course version of the list above.
 
 ## 22. Testing Strategy
 
