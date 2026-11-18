@@ -1,8 +1,10 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { APP_FILTER } from '@nestjs/core';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
+import { AllExceptionsFilter } from './common/filters/all-exceptions.filter.js';
 import { validateEnv } from './config/env.validation.js';
 import { FleetModule } from './fleet/fleet.module.js';
 import { NotifyModule } from './notify/notify.module.js';
@@ -11,6 +13,8 @@ import { SafetyModule } from './safety/safety.module.js';
 import { TripsModule } from './trips/trips.module.js';
 import { UsersModule } from './users/users.module.js';
 import { IdentityModule } from './modules/identity/identity.module.js';
+// Admin fare rules; aliased because src/pricing also exports a PricingModule.
+import { PricingModule as FareRulesModule } from './modules/pricing/pricing.module.js';
 import { SharingModule } from './modules/sharing/sharing.module.js';
 import { TrustModule } from './modules/trust/trust.module.js';
 import { AuditModule } from './modules/audit/audit.module.js';
@@ -46,11 +50,16 @@ import { AuditModule } from './modules/audit/audit.module.js';
     SafetyModule,
     TripsModule,
     IdentityModule,
+    FareRulesModule,
     SharingModule,
     TrustModule,
     AuditModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    // Registered here (not in main.ts) so e2e tests that build AppModule get it too.
+    { provide: APP_FILTER, useClass: AllExceptionsFilter },
+  ],
 })
 export class AppModule {}
