@@ -20,6 +20,7 @@ import { UsersModule } from './users/users.module.js';
         database: config.getOrThrow<string>('DB_NAME'),
         autoLoadEntities: true,
         synchronize: false, // the Docker image already creates the tables
+        parseInt8: true,
       }),
     }),
     UsersModule,
