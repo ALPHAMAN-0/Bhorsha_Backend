@@ -1,10 +1,12 @@
 import {
   Column,
+  CreateDateColumn,
   Entity,
   JoinColumn,
   OneToMany,
   OneToOne,
   PrimaryColumn,
+  UpdateDateColumn,
   type Relation,
   type ValueTransformer,
 } from 'typeorm';
@@ -77,4 +79,16 @@ export class DriverProfile {
 
   @OneToMany(() => Vehicle, (vehicle) => vehicle.driver)
   vehicles: Relation<Vehicle[]>;
+
+    @Column({ name: 'reviewed_by', type: 'integer', nullable: true })
+  reviewedBy: number | null;
+
+  @Column({ name: 'reviewed_at', type: 'timestamptz', nullable: true })
+  reviewedAt: Date | null;
+
+  @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
+  createdAt: Date;
+
+  @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
+  updatedAt: Date;
 }
