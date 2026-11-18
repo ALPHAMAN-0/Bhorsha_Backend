@@ -67,12 +67,17 @@ function setup() {
   return { service, runner, users, drivers, jwt, passwords, loginQuery };
 }
 
-const rider: RegisterDto = {
-  fullName: 'Rahim Uddin',
-  phone: '+8801712345678',
-  password: 'Str0ngPass!',
-  role: Role.RIDER,
-};
+function registration(overrides: Partial<RegisterDto> = {}): RegisterDto {
+  return {
+    fullName: 'Rahim Uddin',
+    phone: '+8801712345678',
+    password: 'Str0ngPass!',
+    role: Role.RIDER,
+    ...overrides,
+  };
+}
+
+const rider = registration();
 
 describe('AuthService.register', () => {
   it('creates a rider in one insert and never returns the hash', async () => {
@@ -106,11 +111,9 @@ describe('AuthService.register', () => {
       status: 'OFFLINE',
     });
 
-    const result = await service.register({
-      ...rider,
-      role: Role.DRIVER,
-      licenceNo: 'DK-0123456789',
-    });
+    const result = await service.register(
+      registration({ role: Role.DRIVER, licenceNo: 'DK-0123456789' }),
+    );
 
     expect(runner.manager.insert).toHaveBeenNthCalledWith(2, DriverProfile, {
       userId: 7,
@@ -140,7 +143,7 @@ describe('AuthService.register', () => {
       .mockRejectedValueOnce(taken);
 
     await expect(
-      service.register({ ...rider, role: Role.DRIVER, licenceNo: 'DK-1' }),
+      service.register(registration({ role: Role.DRIVER, licenceNo: 'DK-1' })),
     ).rejects.toBe(taken);
 
     expect(runner.rollbackTransaction).toHaveBeenCalled();
@@ -151,7 +154,7 @@ describe('AuthService.register', () => {
   it('refuses a licence number on a rider account', async () => {
     const { service, passwords } = setup();
     await expect(
-      service.register({ ...rider, licenceNo: 'DK-1' }),
+      service.register(registration({ licenceNo: 'DK-1' })),
     ).rejects.toBeInstanceOf(BadRequestException);
     expect(passwords.hash).not.toHaveBeenCalled();
   });

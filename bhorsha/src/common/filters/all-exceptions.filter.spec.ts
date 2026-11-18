@@ -23,7 +23,7 @@ function run(exception: unknown, options: { requestId?: string; headersSent?: bo
   const json = vi.fn();
   const response = {
     headersSent: options.headersSent ?? false,
-    status: vi.fn(() => ({ json })),
+    status: vi.fn((_code: number) => ({ json })),
   };
   const request = {
     method: 'POST',
