@@ -3,16 +3,18 @@ import {
   type ExecutionContext,
   UnauthorizedException,
 } from '@nestjs/common';
-import type { Request } from 'express';
+import type { AuthenticatedRequest } from '../guards/auth-user.js';
 
+/**
+ * The id of the logged-in user. The global JwtAuthGuard sets it from the
+ * Bearer token, or from the x-user-id header while ALLOW_X_USER_ID=true in
+ * development. The header itself is no longer trusted here.
+ */
 export const CurrentUserId = createParamDecorator(
   (_data: unknown, ctx: ExecutionContext): number => {
-    const request = ctx.switchToHttp().getRequest<Request>();
-    const userId = Number(request.header('x-user-id'));
-    if (!Number.isInteger(userId) || userId <= 0) {
-      throw new UnauthorizedException(
-        'Send your user id in the x-user-id header',
-      );
+    const userId = ctx.switchToHttp().getRequest<AuthenticatedRequest>().user?.id;
+    if (!userId) {
+      throw new UnauthorizedException('Authentication required');
     }
     return userId;
   },
