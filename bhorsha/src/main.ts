@@ -30,9 +30,13 @@ async function bootstrap() {
     .setDescription(
       'Fair Ride-Hailing & Ride-Sharing Platform for Dhaka\n\n' +
       '### How to Authenticate in Swagger:\n' +
-      'Simply type your User ID in the **`x-user-id`** input box of each endpoint (e.g. `1` for Rider, `2` for Passenger).',
+      'Log in with **POST /auth/login**, press **Authorize** and paste the `accessToken`.\n\n' +
+      'Development only (`ALLOW_X_USER_ID=true` in .env): you can instead type your User ID in the **`x-user-id`** input box of each endpoint (e.g. `1` for Rider, `2` for Passenger).',
     )
     .addTag('Rider Domain', '13 Core Endpoints: Quotes, Booking, Join Requests, Ratings, and SOS')
+    .addBearerAuth({ type: 'http', scheme: 'bearer', bearerFormat: 'JWT' }, 'bearer')
+    // Every endpoint needs the token except the @Public() ones (register, login).
+    .addSecurityRequirements('bearer')
     .build();
 
   const document = SwaggerModule.createDocument(app, swaggerConfig);
