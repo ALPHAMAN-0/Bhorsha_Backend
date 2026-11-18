@@ -13,6 +13,8 @@ import { SafetyModule } from './safety/safety.module.js';
 import { TripsModule } from './trips/trips.module.js';
 import { UsersModule } from './users/users.module.js';
 import { IdentityModule } from './modules/identity/identity.module.js';
+// Admin fare rules; aliased because src/pricing also exports a PricingModule.
+import { PricingModule as FareRulesModule } from './modules/pricing/pricing.module.js';
 import { SharingModule } from './modules/sharing/sharing.module.js';
 import { TrustModule } from './modules/trust/trust.module.js';
 import { AuditModule } from './modules/audit/audit.module.js';
@@ -48,6 +50,7 @@ import { AuditModule } from './modules/audit/audit.module.js';
     SafetyModule,
     TripsModule,
     IdentityModule,
+    FareRulesModule,
     SharingModule,
     TrustModule,
     AuditModule,
