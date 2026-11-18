@@ -1,6 +1,6 @@
 # Bhorsha database — runs the published image from Docker Hub. No build, no SQL files needed.
 #
-# Needs Docker. Settings come from .env (make it with: cp env.example .env).
+# Needs Docker. Settings come from .env (make it with: cp .env.example .env).
 # Without a .env it still works, using the defaults below.
 #   docker compose up -d        start (first run downloads the image and loads tables + demo data)
 #   docker compose ps           wait until bhorsha-db shows "(healthy)"
