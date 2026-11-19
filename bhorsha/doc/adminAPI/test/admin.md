@@ -16,7 +16,7 @@
 4. [How a request travels through the app](#slide-4--how-a-request-travels-through-the-app)
 5. [The 11 admin endpoints](#slide-5--the-11-admin-endpoints)
 6. [Concepts, one by one](#slide-6--concepts-one-by-one)
-7. [Database tables my part uses](#slide-7--database-tables-my-part-uses)
+7. [Database tables and the SQL that creates them](#slide-7--database-tables-and-the-sql-that-creates-them)
 8. [Testing and results](#slide-8--testing-and-results)
 9. [Merging the team's branches: problems and fixes](#slide-9--merging-the-teams-branches-problems-and-fixes)
 10. [Live demo script](#slide-10--live-demo-script)
@@ -386,15 +386,20 @@ Each developer makes their own secret, for example with `openssl rand -base64 48
 
 ---
 
-## Slide 7 · Database tables my part uses
+## Slide 7 · Database tables and the SQL that creates them
 
-The schema comes from the shared Docker image `siam001/bhorsha-db:2.0.0` (13 tables). TypeORM runs with `synchronize: false`, so the app never changes the schema.
+The schema comes from the shared Docker image `siam001/bhorsha-db:2.0.0` (13 tables).
+- When the database starts for the first time, the image runs `/docker-entrypoint-initdb.d/01_schema.sql`.
+- TypeORM runs with `synchronize: false`, so the app never changes the schema.
+- The SQL below is copied word for word from that file. It was checked against the running database on 19 Nov 2026: same 33 columns, same constraints, indexes and triggers.
+
+### 7.1 The three tables at a glance
 
 | Table | Key columns | Rules in the database |
 |---|---|---|
-| `users` | `id`, `full_name`, `phone` (unique), `email` (unique, optional), `password_hash` (never selected), `role` (RIDER, DRIVER, ADMIN, SUPPORT), `is_active`, `suspended_until` | `uq_users_phone`, `uq_users_email`, `ck_users_phone_format`, `ck_users_email_format`, `ck_users_full_name` |
-| `driver_profiles` | `user_id` (also the primary key), `licence_no` (unique), `verification` (PENDING, VERIFIED, REJECTED), `status` (OFFLINE, ONLINE), `rejection_reason`, `reviewed_by`, `reviewed_at` | `uq_driver_profiles_licence_no`, `ck_driver_profiles_online_verified`, `ck_driver_profiles_review` |
-| `fare_rules` | `vehicle_type` (unique), `base_paisa`, `per_km_paisa`, `base_distance_m`, `ceiling_base_paisa`, `ceiling_per_km_paisa`, `share_discount_bps`, `updated_by` | `ck_fare_rules_within_ceiling`, `ck_fare_rules_amounts`, `ck_fare_rules_share_discount`, trigger `trg_fare_rules_regulation_frozen` |
+| `users` | `id`, `full_name`, `phone` (unique), `email` (unique, optional), `password_hash` (never selected), `role` (RIDER, DRIVER, ADMIN, SUPPORT), `is_active`, `suspended_until` | `uq_users_phone`, `uq_users_email`, `ck_users_full_name`, `ck_users_phone_format`, `ck_users_email_format` |
+| `driver_profiles` | `user_id` (also the primary key), `licence_no` (unique), `verification` (PENDING, VERIFIED, REJECTED), `status` (OFFLINE, ONLINE), `rejection_reason`, `reviewed_by`, `reviewed_at` | `uq_driver_profiles_licence_no`, `ck_driver_profiles_online_verified`, `ck_driver_profiles_review`, `ck_driver_profiles_rejection_reason`, `ck_driver_profiles_licence_no`, `ck_driver_profiles_location` |
+| `fare_rules` | `vehicle_type` (unique), `base_paisa`, `per_km_paisa`, `base_distance_m`, `ceiling_base_paisa`, `ceiling_per_km_paisa`, `share_discount_bps`, `updated_by` | `uq_fare_rules_vehicle_type`, `ck_fare_rules_amounts`, `ck_fare_rules_base_distance`, `ck_fare_rules_share_discount`, `ck_fare_rules_within_ceiling`, trigger `trg_fare_rules_regulation_frozen` |
 
 ```mermaid
 erDiagram
@@ -402,6 +407,252 @@ erDiagram
     users ||--o{ driver_profiles : "an admin reviews (reviewed_by)"
     users ||--o{ fare_rules : "an admin last edited (updated_by)"
 ```
+
+### 7.2 Step 1: types, domains and the shared trigger function
+
+Enums limit a column to a fixed list of values, so a typo like `'ADMN'` can never be stored. Domains are reusable column types with a built-in check.
+
+```sql
+-- Types. Status enums mirror the state diagrams in the architecture document.
+CREATE TYPE user_role           AS ENUM ('RIDER', 'DRIVER', 'ADMIN', 'SUPPORT');
+CREATE TYPE driver_verification AS ENUM ('PENDING', 'VERIFIED', 'REJECTED');
+CREATE TYPE driver_status       AS ENUM ('OFFLINE', 'ONLINE');
+CREATE TYPE vehicle_type        AS ENUM ('BIKE', 'CAR', 'CNG');
+
+-- Coordinates: about 0.1 m precision, range-checked once here instead of on every column.
+CREATE DOMAIN geo_lat AS numeric(9,6) CONSTRAINT ck_geo_lat_range CHECK (VALUE BETWEEN -90 AND 90);
+CREATE DOMAIN geo_lng AS numeric(9,6) CONSTRAINT ck_geo_lng_range CHECK (VALUE BETWEEN -180 AND 180);
+
+-- Keeps updated_at current on every UPDATE, including raw SQL such as the seat transaction.
+CREATE FUNCTION set_updated_at() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  NEW.updated_at := now();
+  RETURN NEW;
+END $$;
+```
+
+### 7.3 Step 2: `users`, every account in the system
+
+```sql
+CREATE TABLE users (
+  id               integer      GENERATED ALWAYS AS IDENTITY,
+  full_name        varchar(100) NOT NULL,
+  phone            varchar(16)  NOT NULL,
+  email            varchar(254),
+  password_hash    varchar(255) NOT NULL,
+  role             user_role    NOT NULL,
+  is_active        boolean      NOT NULL DEFAULT true,
+  suspended_until  timestamptz,
+  created_at       timestamptz  NOT NULL DEFAULT now(),
+  updated_at       timestamptz  NOT NULL DEFAULT now(),
+  CONSTRAINT pk_users PRIMARY KEY (id),
+  CONSTRAINT uq_users_phone UNIQUE (phone),
+  CONSTRAINT uq_users_email UNIQUE (email),
+  CONSTRAINT ck_users_full_name CHECK (btrim(full_name) <> ''),
+  -- Bangladesh mobile numbers in E.164 form: +8801[3-9]XXXXXXXX. Normalise in the DTO.
+  CONSTRAINT ck_users_phone_format CHECK (phone ~ '^\+8801[3-9][0-9]{8}$'),
+  -- Stored lower-case (normalise in the DTO), so UNIQUE is effectively case-insensitive.
+  CONSTRAINT ck_users_email_format CHECK (email = lower(email) AND email ~ '^[^@\s]+@[^@\s]+\.[^@\s]+$')
+);
+CREATE INDEX ix_users_role ON users (role, id DESC);
+
+COMMENT ON TABLE  users IS 'identity module. Every account: rider, driver, admin or support officer. Plural because "user" is reserved.';
+COMMENT ON COLUMN users.password_hash IS 'bcrypt hash (cost 12). Never selected by default and never returned or logged.';
+COMMENT ON COLUMN users.is_active IS 'false = deactivated by an admin (the soft delete behind DELETE /users/:id).';
+COMMENT ON COLUMN users.suspended_until IS 'Suspended while now() < suspended_until (3 active strikes = 7 days, section 16). NULL = not suspended.';
+```
+
+What to point out:
+- **`GENERATED ALWAYS AS IDENTITY`**: the database makes every id. An insert can't pick its own id unless it says `OVERRIDING SYSTEM VALUE`, which only the seed file does.
+- **`ck_users_phone_format`** is the same regular expression as `PHONE_PATTERN` in the DTO. The API answers 400 first; the database is the safety net.
+- **`ck_users_email_format`** forces lower case, so `Admin@x.com` and `admin@x.com` can't both exist. The DTO lower-cases emails before saving.
+- **`ix_users_role (role, id DESC)`** serves `GET /users?role=...`, which lists newest first.
+- The table is called `users`, not `user`, because `user` is a reserved word in PostgreSQL.
+
+### 7.4 Step 3: `driver_profiles`, the extra data a driver needs
+
+```sql
+CREATE TABLE driver_profiles (
+  user_id           integer             NOT NULL,
+  licence_no        varchar(30)         NOT NULL,
+  verification      driver_verification NOT NULL DEFAULT 'PENDING',
+  reviewed_by       integer,
+  reviewed_at       timestamptz,
+  rejection_reason  text,
+  status            driver_status       NOT NULL DEFAULT 'OFFLINE',
+  last_lat          geo_lat,
+  last_lng          geo_lng,
+  last_location_at  timestamptz,
+  created_at        timestamptz         NOT NULL DEFAULT now(),
+  updated_at        timestamptz         NOT NULL DEFAULT now(),
+  CONSTRAINT pk_driver_profiles PRIMARY KEY (user_id),
+  CONSTRAINT fk_driver_profiles_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE RESTRICT,
+  CONSTRAINT fk_driver_profiles_reviewed_by FOREIGN KEY (reviewed_by) REFERENCES users (id) ON DELETE RESTRICT,
+  CONSTRAINT uq_driver_profiles_licence_no UNIQUE (licence_no),
+  CONSTRAINT ck_driver_profiles_licence_no CHECK (btrim(licence_no) <> ''),
+  -- Only a verified driver can go online. Rejecting an online driver must set OFFLINE in the same UPDATE.
+  CONSTRAINT ck_driver_profiles_online_verified CHECK (status = 'OFFLINE' OR verification = 'VERIFIED'),
+  -- Every verification decision names the admin who made it and when.
+  CONSTRAINT ck_driver_profiles_review CHECK (verification = 'PENDING' OR (reviewed_by IS NOT NULL AND reviewed_at IS NOT NULL)),
+  CONSTRAINT ck_driver_profiles_rejection_reason CHECK (verification <> 'REJECTED' OR rejection_reason IS NOT NULL),
+  CONSTRAINT ck_driver_profiles_location CHECK (
+    (last_lat IS NULL) = (last_lng IS NULL) AND (last_lat IS NULL) = (last_location_at IS NULL))
+);
+-- Admin verification queue (GET /drivers?verification=PENDING).
+CREATE INDEX ix_driver_profiles_pending ON driver_profiles (created_at) WHERE verification = 'PENDING';
+
+COMMENT ON TABLE  driver_profiles IS 'fleet module. Driver extension of users (1:1, shared primary key). Created with the user in one transaction.';
+COMMENT ON COLUMN driver_profiles.last_lat IS 'Last posted position (PUT /drivers/me/location). Live tracking moves to Redis GEO in the full product.';
+```
+
+What to point out:
+- **Shared primary key:** `user_id` is both the primary key and a foreign key to `users`. That makes the relationship exactly one-to-one: a user has at most one driver profile.
+- **`ON DELETE RESTRICT`**: a user who has a driver profile, or who reviewed one, can't be deleted. That is why `DELETE /users/:id` deactivates instead (6.11).
+- **Three rules back up the admin's verification step:**
+  - `ck_driver_profiles_online_verified`: an unverified driver can't go online.
+  - `ck_driver_profiles_review`: any decision must record who made it and when.
+  - `ck_driver_profiles_rejection_reason`: a rejection must give a reason.
+
+  These match the API rules in 6.12 one for one.
+- **`ix_driver_profiles_pending`** is a *partial index*. It only holds PENDING rows, so the admin's queue stays fast and small, however many drivers are already verified.
+
+### 7.5 Step 4: `fare_rules` and the frozen legal ceiling
+
+```sql
+-- One editable rule per vehicle type (no version history in the course release).
+-- Fare for a distance d:     base_paisa + per_km_paisa * max(d - base_distance_m, 0) / 1000
+-- Legal ceiling for d:       ceiling_base_paisa + ceiling_per_km_paisa * max(d - base_distance_m, 0) / 1000
+-- Shared fare per passenger: fare * (10000 - share_discount_bps) / 10000, never above the ceiling.
+-- Round each result to the nearest paisa (round half up).
+CREATE TABLE fare_rules (
+  id                    integer      GENERATED ALWAYS AS IDENTITY,
+  vehicle_type          vehicle_type NOT NULL,
+  base_paisa            bigint       NOT NULL,
+  per_km_paisa          bigint       NOT NULL,
+  base_distance_m       integer      NOT NULL DEFAULT 2000,
+  ceiling_base_paisa    bigint       NOT NULL,
+  ceiling_per_km_paisa  bigint       NOT NULL,
+  share_discount_bps    integer      NOT NULL DEFAULT 2500,
+  updated_by            integer,
+  created_at            timestamptz  NOT NULL DEFAULT now(),
+  updated_at            timestamptz  NOT NULL DEFAULT now(),
+  CONSTRAINT pk_fare_rules PRIMARY KEY (id),
+  CONSTRAINT fk_fare_rules_updated_by FOREIGN KEY (updated_by) REFERENCES users (id) ON DELETE RESTRICT,
+  CONSTRAINT uq_fare_rules_vehicle_type UNIQUE (vehicle_type),
+  CONSTRAINT ck_fare_rules_amounts CHECK (
+    base_paisa >= 0 AND per_km_paisa >= 0 AND ceiling_base_paisa > 0 AND ceiling_per_km_paisa > 0),
+  CONSTRAINT ck_fare_rules_base_distance CHECK (base_distance_m >= 0),
+  -- A shared fare must always be lower than the solo fare (section 3).
+  CONSTRAINT ck_fare_rules_share_discount CHECK (share_discount_bps BETWEEN 1 AND 9999),
+  -- Legal Fare Guard for the tariff: both formulas share base_distance_m, so comparing
+  -- them part by part proves fare(d) <= ceiling(d) for every distance d.
+  CONSTRAINT ck_fare_rules_within_ceiling CHECK (base_paisa <= ceiling_base_paisa AND per_km_paisa <= ceiling_per_km_paisa)
+);
+
+-- The ceiling and its base distance are regulation (Taxicab Service Guidelines 2010), not
+-- admin settings. If the admin could edit them, the Legal Fare Guard would be meaningless.
+-- Change them only with a migration, which disables this trigger for that one UPDATE.
+CREATE FUNCTION fare_rules_regulation_frozen() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  IF (NEW.vehicle_type, NEW.base_distance_m, NEW.ceiling_base_paisa, NEW.ceiling_per_km_paisa)
+     IS DISTINCT FROM (OLD.vehicle_type, OLD.base_distance_m, OLD.ceiling_base_paisa, OLD.ceiling_per_km_paisa) THEN
+    RAISE EXCEPTION 'The legal ceiling of fare rule % is regulation; change it with a migration', OLD.id
+      USING ERRCODE = 'check_violation', CONSTRAINT = 'ck_fare_rules_regulation_frozen', TABLE = TG_TABLE_NAME;
+  END IF;
+  RETURN NEW;
+END $$;
+
+CREATE TRIGGER trg_fare_rules_regulation_frozen
+  BEFORE UPDATE OF vehicle_type, base_distance_m, ceiling_base_paisa, ceiling_per_km_paisa ON fare_rules
+  FOR EACH ROW EXECUTE FUNCTION fare_rules_regulation_frozen();
+
+COMMENT ON TABLE  fare_rules IS 'pricing module. One rule per vehicle type. The admin edits base_paisa, per_km_paisa and share_discount_bps; the ceiling columns are frozen.';
+COMMENT ON COLUMN fare_rules.base_distance_m IS 'Distance included in the base fare: the legal "first 2 km". Shared by the tariff and the ceiling formulas.';
+```
+
+What to point out:
+- **Why comparing the parts is enough:** the fare and the ceiling use the same formula shape and the same `base_distance_m`. If the base fare is at most the ceiling's base, and the per-km rate is at most the ceiling's per-km rate, then the fare is below the ceiling for **every** distance. One `CHECK` covers every ride.
+- **Why a trigger and not a `CHECK`:** a `CHECK` only sees the new row. To say "this column must not *change*", the database has to compare the old row with the new one, and only a trigger can do that.
+- **The trigger reports itself as a check violation** with the name `ck_fare_rules_regulation_frozen`. The API's exception filter maps that name to 409 `The legal ceiling can only change by migration`, the same way as a real constraint.
+- **`uq_fare_rules_vehicle_type`**: exactly one rule per vehicle type, so there's never any doubt which fare applies.
+
+### 7.6 Step 5: keep `updated_at` correct
+
+```sql
+CREATE TRIGGER trg_users_updated_at           BEFORE UPDATE ON users           FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+CREATE TRIGGER trg_driver_profiles_updated_at BEFORE UPDATE ON driver_profiles FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+CREATE TRIGGER trg_fare_rules_updated_at      BEFORE UPDATE ON fare_rules      FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+```
+
+The database sets `updated_at` itself. It stays right even for an update that doesn't come through TypeORM, such as a raw `UPDATE` in a transaction or one run by hand in DBeaver.
+
+### 7.7 Seed rows for the fare rules
+
+From `/docker-entrypoint-initdb.d/02_seed.sql`. Amounts are in paisa: BIKE base Tk 30, Tk 12 per km after the first 2 km.
+
+```sql
+INSERT INTO fare_rules (id, vehicle_type, base_paisa, per_km_paisa, base_distance_m, ceiling_base_paisa, ceiling_per_km_paisa,
+                        share_discount_bps, updated_by, created_at, updated_at)
+OVERRIDING SYSTEM VALUE VALUES
+  (1, 'BIKE', 3000, 1200, 2000, 4000, 1800, 2500, NULL, now() - interval '60 days', now() - interval '60 days'),
+  (2, 'CAR',  6000, 2500, 2000, 8500, 3400, 2500, 1,    now() - interval '60 days', now() - interval '10 days'),
+  (3, 'CNG',  4000, 1800, 2000, 5500, 2500, 2500, NULL, now() - interval '60 days', now() - interval '60 days');
+```
+
+The 13 demo accounts in `users` are seeded the same way. They all share one precomputed bcrypt hash of `Bhorsha@123` with **cost 10** (`$2a$10$...`), to keep demo logins fast. Accounts created through the API use cost 12 (`BCRYPT_ROUNDS`). `bcrypt.compare` reads the cost from the hash itself, so both kinds of account log in the same way.
+
+### 7.8 How each database rule reaches the API
+
+| Database rule | When it fires | What the API answers |
+|---|---|---|
+| `uq_users_phone` | Register or create staff with a phone that's already used | 409 `Phone number already registered` |
+| `uq_users_email` | Same, for email | 409 `Email already registered` |
+| `uq_driver_profiles_licence_no` | A driver registers with a licence number that's already used; the whole registration is rolled back | 409 `Licence number already registered` |
+| `ck_users_phone_format` | A bad phone number. The DTO catches it first, so this is only a safety net | 400 from the DTO |
+| `ck_driver_profiles_online_verified` | An unverified driver tries to go online | 409 `Only verified drivers can go online` |
+| `ck_fare_rules_within_ceiling` | A fare above the ceiling. The service catches it first; this is the safety net | 409 `Fare is above the legal ceiling` |
+| `ck_fare_rules_regulation_frozen` (trigger) | Anything tries to change a ceiling column | 409 `The legal ceiling can only change by migration` (the DTO already refuses those fields with 400) |
+| Any other check or foreign key | | 409 `Request conflicts with the current data` |
+
+### 7.9 Prove the rules yourself in psql
+
+Open psql on the Docker database:
+
+```bash
+docker exec -it bhorsha-db psql -U bhorsha -d bhorsha
+```
+
+Each statement below is **refused** by the database, so nothing changes. Run them one at a time.
+
+```sql
+-- 1. Fare above the legal ceiling (BIKE ceiling is 1800 paisa per km)
+UPDATE fare_rules SET per_km_paisa = 999999 WHERE id = 1;
+-- ERROR:  new row for relation "fare_rules" violates check constraint "ck_fare_rules_within_ceiling"
+
+-- 2. The admin tries to raise the ceiling itself
+UPDATE fare_rules SET ceiling_per_km_paisa = 5000 WHERE id = 1;
+-- ERROR:  The legal ceiling of fare rule 1 is regulation; change it with a migration
+
+-- 3. A phone number in the wrong format
+INSERT INTO users (full_name, phone, password_hash, role) VALUES ('Test', '01711000003', 'x', 'RIDER');
+-- ERROR:  new row for relation "users" violates check constraint "ck_users_phone_format"
+
+-- 4a. Reject Karim (user 5) while he is ONLINE: a rejected driver can't stay online
+UPDATE driver_profiles SET verification = 'REJECTED', reviewed_by = 1, reviewed_at = now() WHERE user_id = 5;
+-- ERROR:  new row for relation "driver_profiles" violates check constraint "ck_driver_profiles_online_verified"
+
+-- 4b. Take him OFFLINE in the same UPDATE, as the API does, but give no reason
+UPDATE driver_profiles SET verification = 'REJECTED', status = 'OFFLINE', reviewed_by = 1, reviewed_at = now() WHERE user_id = 5;
+-- ERROR:  new row for relation "driver_profiles" violates check constraint "ck_driver_profiles_rejection_reason"
+
+-- 5. Choose your own id
+INSERT INTO users (id, full_name, phone, password_hash, role) VALUES (999, 'Test', '+8801799999999', 'x', 'RIDER');
+-- ERROR:  cannot insert a non-DEFAULT value into column "id"
+```
+
+4a and 4b together show why the API rejects a driver **and** sets them OFFLINE in one statement (6.12). When several rules are broken at once, PostgreSQL reports the first one by name, in alphabetical order.
+
+These outputs come from the real database on 19 Nov 2026. Each statement was run inside `BEGIN … ROLLBACK` to be safe, and the data was unchanged afterwards.
 
 ---
 
@@ -676,7 +927,7 @@ Honest list of what isn't done yet:
 
 | Item | Status | Next step |
 |---|---|---|
-| Database migrations | `src/database/migrations` holds only a `.gitkeep`. The schema comes from the Docker image | Add TypeORM migrations, starting with the fare ceiling |
+| Database migrations | The image records `SchemaBaseline1794441600000` as already applied, in its `typeorm_migrations` table. But the migration file it names (`src/database/migrations/1794441600000-SchemaBaseline.ts`) and `src/database/typeorm.config.ts` aren't in the repo on any branch; `src/database/migrations` holds only a `.gitkeep`. The schema comes only from the Docker image | Commit the baseline migration, which runs `01_schema.sql`, and the TypeORM config. Then ship every schema change, such as a new fare ceiling, as a new migration |
 | `GET /auth/me` | Planned in the report's endpoint table, not built | Add it, or remove it from the report table |
 | Refresh tokens | Only a 15-minute access token | Add a refresh token with rotation |
 | Swagger 401/403 | Shown as "Undocumented" in Swagger | Add `@ApiResponse` for 401 and 403 on admin routes |
