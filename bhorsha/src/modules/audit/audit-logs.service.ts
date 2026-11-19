@@ -18,7 +18,7 @@ export class AuditLogsService {
     if(q.entity!==undefined) { if(typeof q.entity!=='string'||!/^\w{1,100}$/.test(q.entity)) throw new BadRequestException('Invalid entity'); filter('entity',q.entity); }
     if(q.from!==undefined) {const d=new Date(String(q.from));if(isNaN(d.getTime()))throw new BadRequestException('Invalid from'); args.push(d);conditions.push(`created_at >= $${args.length}`);}
     if(q.to!==undefined) {const d=new Date(String(q.to));if(isNaN(d.getTime()))throw new BadRequestException('Invalid to'); args.push(d);conditions.push(`created_at <= $${args.length}`);}
-    if(q.cursor!==undefined){ const n=BigInt(String(q.cursor)); if(n<=0n)throw new BadRequestException('Invalid cursor');args.push(n.toString());conditions.push(`id < $${args.length}`); }
+    if(q.cursor!==undefined){ const raw=String(q.cursor); if(!/^\d+$/.test(raw))throw new BadRequestException('Invalid cursor'); const n=BigInt(raw); if(n<=0n)throw new BadRequestException('Invalid cursor');args.push(n.toString());conditions.push(`id < $${args.length}`); }
     args.push(limitOf(q.limit));
     return this.db.query(`SELECT * FROM audit_logs ${conditions.length?'WHERE '+conditions.join(' AND '):''} ORDER BY id DESC LIMIT $${args.length}`,args);
   }
