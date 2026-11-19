@@ -9,3 +9,5 @@ package.json
 package-lock.json
 pnpm-workspace.yaml
 turbo.json
+
+.claude/
