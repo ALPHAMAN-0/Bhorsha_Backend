@@ -38,7 +38,13 @@ export class TripsController {
   @ApiOperation({ summary: 'Calculate upfront fare quote with BRTA legal ceiling rules' })
   @ApiQuery({ name: 'vehicle_type', enum: VehicleType, required: false })
   @ApiQuery({ name: 'distance_km', type: Number, required: false, example: 5.0 })
-  @ApiQuery({ name: 'is_shared', type: Boolean, required: false, example: false })
+  @ApiQuery({
+    name: 'is_shared',
+    type: Boolean,
+    required: false,
+    example: false,
+    description: 'Share the ride with other riders (CAR or CNG only; a BIKE is never shared)',
+  })
   getQuote(
     @Query('vehicle_type') vehicleType?: VehicleType,
     @Query('distance_km') distanceKm?: string,

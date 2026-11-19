@@ -46,7 +46,7 @@ export class CreateRideDto {
 
   @ApiPropertyOptional({
     example: false,
-    description: 'True for seat-sharing (carpool), False for solo ride',
+    description: 'True for seat-sharing (carpool, CAR or CNG only; a BIKE is never shared), False for solo ride',
     default: false,
   })
   @IsOptional()

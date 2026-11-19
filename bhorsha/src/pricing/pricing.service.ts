@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { VehicleType } from '../fleet/vehicle-type.js';
+import { SEAT_CAPACITY, VehicleType } from '../fleet/vehicle-type.js';
 import { bpsToPercent, paisaToTk as toTk } from '../common/money.js';
 import { FareRule } from '../modules/pricing/entities/fare-rule.entity.js';
 
@@ -44,6 +44,12 @@ export class PricingService {
   ): Promise<QuoteResult> {
     if (!Number.isFinite(distanceKm) || distanceKm <= 0) {
       throw new BadRequestException('distance_km must be a positive number');
+    }
+    // A one-seat vehicle (BIKE) is never shared: the database's ck_rides_bike_solo refuses it too.
+    if (isShared && SEAT_CAPACITY[vehicleType] < 2) {
+      throw new BadRequestException(
+        `A ${vehicleType} ride can't be shared: it has room for only one rider`,
+      );
     }
 
     const rule = await this.fareRuleRepo.findOne({ where: { vehicleType } });
