@@ -1,11 +1,9 @@
 import { Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { SosEvent } from './entities/sos-event.entity.js';
 import { SafetyService } from './safety.service.js';
 
+// No entities: DB v2 has no SOS table. An SOS is emailed (NotifyModule is global).
 @Module({
-  imports: [TypeOrmModule.forFeature([SosEvent])],
   providers: [SafetyService],
-  exports: [SafetyService, TypeOrmModule],
+  exports: [SafetyService],
 })
 export class SafetyModule {}

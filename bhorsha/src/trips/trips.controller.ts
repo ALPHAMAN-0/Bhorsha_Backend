@@ -13,7 +13,6 @@ import {
   ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
-import { CurrentUserId } from '../common/decorators/current-user-id.decorator.js';
 import { CurrentUser } from '../common/decorators/current-user.decorator.js';
 import { Roles } from '../common/decorators/roles.decorator.js';
 import { ApiPagination } from '../common/dto/page.js';
@@ -26,7 +25,7 @@ import { CreateJoinRequestDto } from './dto/create-join-request.dto.js';
 import { CreateRatingDto } from './dto/create-rating.dto.js';
 import { CreateRideDto } from './dto/create-ride.dto.js';
 import { FindRidesQueryDto } from './dto/find-rides-query.dto.js';
-import { TriggerSosDto } from './dto/trigger-sos.dto.js';
+import { SosLocationDto, TriggerSosDto } from './dto/trigger-sos.dto.js';
 import { TripsService } from './trips.service.js';
 
 @ApiTags('Rider Domain')
@@ -163,23 +162,32 @@ export class TripsController {
   }
 
   @Post('rides/:id/sos')
-  @ApiOperation({ summary: 'Trigger emergency SOS for a specific ride with SMTP email dispatch' })
+  @ApiOperation({
+    summary: 'Send an SOS for a ride you are on (emailed to the safety inbox)',
+    description:
+      '404 if the ride does not exist, 403 if you are not its driver or one of its riders, ' +
+      '503 if the email could not be sent.',
+  })
   @ApiHeader({ name: 'x-user-id', description: 'Passenger User ID', required: true, example: '1' })
-  triggerRideSos(
-    @CurrentUserId() userId: number,
-    @Param('id') id: string,
-    @Body() dto: TriggerSosDto,
+  async triggerRideSos(
+    @CurrentUser() user: AuthUser,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: SosLocationDto,
   ) {
-    return this.safetyService.triggerSos(userId, id, dto.lat, dto.lng);
+    const ride = await this.tripsService.findOne(user, id);
+    return this.safetyService.triggerSos(user.id, ride, dto.lat, dto.lng);
   }
 
   @Post('sos')
-  @ApiOperation({ summary: 'Trigger general emergency SOS' })
+  @ApiOperation({
+    summary: 'Send an SOS, with or without a ride (emailed to the safety inbox)',
+    description:
+      'ride_id is optional. When given, it must be a ride you are on (404 / 403 otherwise). ' +
+      '503 if the email could not be sent.',
+  })
   @ApiHeader({ name: 'x-user-id', description: 'Passenger User ID', required: true, example: '1' })
-  triggerGeneralSos(
-    @CurrentUserId() userId: number,
-    @Body() dto: TriggerSosDto,
-  ) {
-    return this.safetyService.triggerSos(userId, dto.ride_id, dto.lat, dto.lng);
+  async triggerGeneralSos(@CurrentUser() user: AuthUser, @Body() dto: TriggerSosDto) {
+    const ride = dto.ride_id ? await this.tripsService.findOne(user, dto.ride_id) : null;
+    return this.safetyService.triggerSos(user.id, ride, dto.lat, dto.lng);
   }
 }

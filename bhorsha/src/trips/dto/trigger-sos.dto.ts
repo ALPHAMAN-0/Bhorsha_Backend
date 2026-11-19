@@ -1,25 +1,16 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import {
-  IsNumber,
-  IsOptional,
-  IsString,
-} from 'class-validator';
+import { IsInt, IsNumber, IsOptional, Max, Min } from 'class-validator';
 
-export class TriggerSosDto {
-  @ApiPropertyOptional({
-    example: 'cf9bdb60-e143-4ec2-8868-2dc4289cb912',
-    description: 'Ride UUID (optional if triggering general emergency)',
-  })
-  @IsOptional()
-  @IsString()
-  ride_id?: string;
-
+/** Body of POST /rides/:id/sos: where the rider is now (the ride is in the URL). */
+export class SosLocationDto {
   @ApiPropertyOptional({
     example: 23.8103,
     description: 'Current latitude for live police dispatch',
   })
   @IsOptional()
   @IsNumber()
+  @Min(-90)
+  @Max(90)
   lat?: number;
 
   @ApiPropertyOptional({
@@ -28,5 +19,19 @@ export class TriggerSosDto {
   })
   @IsOptional()
   @IsNumber()
+  @Min(-180)
+  @Max(180)
   lng?: number;
+}
+
+/** Body of POST /sos: the location, and optionally a ride the sender is on. */
+export class TriggerSosDto extends SosLocationDto {
+  @ApiPropertyOptional({
+    example: 1,
+    description: 'Ride ID, if the SOS is about a ride you are on (leave out for a general SOS)',
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  ride_id?: number;
 }
