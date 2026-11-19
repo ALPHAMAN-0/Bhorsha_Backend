@@ -1,4 +1,5 @@
 import { BadRequestException, ParseIntPipe } from '@nestjs/common';
+import { MAX_TK, tkToPaisa } from '../../common/money.js';
 export function positiveId(value: unknown, field = 'id'): number {
   const n = Number(value);
   if (!Number.isSafeInteger(n) || n <= 0) throw new BadRequestException(`${field} must be a positive integer`);
@@ -23,10 +24,13 @@ export function limitOf(value: unknown, maximum = 100): number {
   if (n > maximum) throw new BadRequestException(`limit must be at most ${maximum}`);
   return n;
 }
-export function paisa(value: unknown): string | null {
+/** Reads a Tk amount (up to 2 decimals) from the request and returns it as paisa for the bigint column. */
+export function tkAsPaisa(value: unknown, field = 'amountClaimedTk'): string | null {
   if (value === undefined || value === null) return null;
-  if (!(typeof value === 'string' || typeof value === 'number') || !/^\d+$/.test(String(value))) throw new BadRequestException('amountClaimedPaisa must be nonnegative integer paisa');
-  return String(value);
+  if (!(typeof value === 'string' || typeof value === 'number') || !/^\d+(\.\d{1,2})?$/.test(String(value)) || Number(value) > MAX_TK) {
+    throw new BadRequestException(`${field} must be a nonnegative Tk amount with at most 2 decimals`);
+  }
+  return String(tkToPaisa(Number(value)));
 }
 export function futureDate(value: unknown, field = 'expiresAt'): Date {
   const date = new Date(String(value));

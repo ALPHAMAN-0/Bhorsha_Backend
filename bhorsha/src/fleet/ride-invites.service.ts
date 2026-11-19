@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
+import { paisaToTk } from '../common/money.js';
 import { DriversService } from './drivers.service.js';
 import { CreateInviteDto } from './dto/create-invite.dto.js';
 import { FareRuleRow, quoteSharedFare, SharedFare } from './shared-fare.js';
@@ -103,8 +104,8 @@ export interface Invite {
   seats: number;
   pickupKm: number;
   distanceM: number;
-  quotedFarePaisa: number;
-  ceilingPaisa: number;
+  quotedFareTk: number;
+  ceilingTk: number;
   status: string;
   expiresAt: Date;
 }
@@ -133,13 +134,19 @@ export class RideInvitesService {
       assertRiderFits(ride, rider);
       await this.assertNoOpenRequest(manager, rideId, rider.riderId);
       const fare = await this.quoteFare(manager, ride.vehicleType, rider);
-      const row = await this.insertInvite(manager, ride, rider, userId, fare);
+      const { quotedFarePaisa, ceilingPaisa, ...row } = await this.insertInvite(
+        manager,
+        ride,
+        rider,
+        userId,
+        fare,
+      );
       return {
         ...row,
         waitingRideId: dto.waitingRideId,
         pickupKm: Number(rider.pickupKm),
-        quotedFarePaisa: Number(row.quotedFarePaisa),
-        ceilingPaisa: Number(row.ceilingPaisa),
+        quotedFareTk: paisaToTk(quotedFarePaisa),
+        ceilingTk: paisaToTk(ceilingPaisa),
       };
     });
   }

@@ -49,6 +49,19 @@ describe('FareRulesService', () => {
     expect(result.meta).toEqual({ page: 1, limit: 10, total: 1 });
   });
 
+  it('shows amounts in Tk and the discount in percent', async () => {
+    const { service } = setup();
+    const result = await service.list({ page: 1, limit: 10 });
+    expect(result.data[0]).toMatchObject({
+      baseTk: 80,
+      perKmTk: 30,
+      ceilingBaseTk: 85,
+      ceilingPerKmTk: 34,
+      shareDiscountPercent: 25,
+    });
+    expect(result.data[0]).not.toHaveProperty('basePaisa');
+  });
+
   it('refuses an empty change', async () => {
     const { service } = setup();
     await expect(service.update(admin, 2, {})).rejects.toBeInstanceOf(
@@ -60,7 +73,7 @@ describe('FareRulesService', () => {
     const { service, rules } = setup();
     rules.findOneBy.mockResolvedValue(null);
     await expect(
-      service.update(admin, 9, { basePaisa: 8000 }),
+      service.update(admin, 9, { baseTk: 80 }),
     ).rejects.toBeInstanceOf(NotFoundException);
   });
 
@@ -68,13 +81,13 @@ describe('FareRulesService', () => {
     const { service, rules } = setup();
     rules.findOneBy.mockResolvedValue(carRule());
 
-    const attempt = service.update(admin, 2, { perKmPaisa: 3401 });
+    const attempt = service.update(admin, 2, { perKmTk: 34.01 });
 
     await expect(attempt).rejects.toBeInstanceOf(ConflictException);
     await attempt.catch((error: ConflictException) => {
       expect(error.getResponse()).toEqual({
         message: 'Fare is above the legal ceiling',
-        details: [{ field: 'perKmPaisa', max: 3400 }],
+        details: [{ field: 'perKmTk', max: 34 }],
       });
     });
     expect(rules.update).not.toHaveBeenCalled();
@@ -85,12 +98,26 @@ describe('FareRulesService', () => {
     rules.findOneBy.mockResolvedValue(carRule());
     rules.findOneByOrFail.mockResolvedValue(carRule({ basePaisa: 8500, updatedBy: 1 }));
 
-    const result = await service.update(admin, 2, { basePaisa: 8500 });
+    const result = await service.update(admin, 2, { baseTk: 85 });
 
     expect(rules.update).toHaveBeenCalledWith(
       { id: 2 },
       { basePaisa: 8500, perKmPaisa: 3000, shareDiscountBps: 2500, updatedBy: 1 },
     );
     expect(result.updatedBy).toBe(1);
+    expect(result.baseTk).toBe(85);
+  });
+
+  it('stores Tk and percent as paisa and basis points', async () => {
+    const { service, rules } = setup();
+    rules.findOneBy.mockResolvedValue(carRule());
+    rules.findOneByOrFail.mockResolvedValue(carRule());
+
+    await service.update(admin, 2, { perKmTk: 0.29, shareDiscountPercent: 12.5 });
+
+    expect(rules.update).toHaveBeenCalledWith(
+      { id: 2 },
+      { basePaisa: 8000, perKmPaisa: 29, shareDiscountBps: 1250, updatedBy: 1 },
+    );
   });
 });

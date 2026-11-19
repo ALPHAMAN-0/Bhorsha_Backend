@@ -13,6 +13,7 @@ import {
   QueryRunner,
   Repository,
 } from 'typeorm';
+import { paisaToTk } from '../common/money.js';
 import { DriversService } from './drivers.service.js';
 import { DriverAvailability } from './entities/driver-profile.entity.js';
 import { Vehicle } from './entities/vehicle.entity.js';
@@ -137,7 +138,7 @@ export interface OpenRide {
   vehicleType: string;
   isShared: boolean;
   seatsFree: number;
-  farePaisa: number;
+  fareTk: number;
   distanceKm: number;
 }
 
@@ -202,7 +203,7 @@ export interface DropOff {
   seatsFree: number;
   passengerId: number;
   passengerStatus: string;
-  farePaisa: number;
+  fareTk: number;
   droppedAt: Date;
 }
 
@@ -241,9 +242,9 @@ export class DriverRidesService {
       MAX_RESULTS,
     ]);
 
-    return rows.map((row) => ({
+    return rows.map(({ farePaisa, ...row }) => ({
       ...row,
-      farePaisa: Number(row.farePaisa),
+      fareTk: paisaToTk(farePaisa),
       distanceKm: Number(row.distanceKm),
     }));
   }
@@ -335,7 +336,7 @@ export class DriverRidesService {
         ...rideAfter,
         passengerId: dropped.passengerId,
         passengerStatus: dropped.passengerStatus,
-        farePaisa: Number(dropped.farePaisa),
+        fareTk: paisaToTk(dropped.farePaisa),
         droppedAt: dropped.droppedAt,
       };
     });

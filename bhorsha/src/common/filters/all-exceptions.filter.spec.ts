@@ -115,7 +115,7 @@ describe('AllExceptionsFilter', () => {
   });
 
   it('keeps details given to an HttpException', () => {
-    const details = [{ field: 'basePaisa', max: 8500 }];
+    const details = [{ field: 'baseTk', max: 85 }];
     const { status, body } = run(
       new ConflictException({ message: 'Fare is above the legal ceiling', details }),
     );

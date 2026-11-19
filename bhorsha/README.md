@@ -228,7 +228,7 @@ The filter turns PostgreSQL errors 23505, 23503 and 23514 into these 409s by con
 | GET | `/drivers` | Admin | List drivers; filter `verification`. The PENDING queue is oldest first |
 | PATCH | `/drivers/:id/verify` | Admin | `VERIFIED`, or `REJECTED` with a `rejectionReason`. Rejecting also sets the driver OFFLINE |
 | GET | `/fare-rules` | Admin | The fare rule for each vehicle type |
-| PATCH | `/fare-rules/:id` | Admin | Change `basePaisa`, `perKmPaisa` or `shareDiscountBps`. Above the legal ceiling → 409; the ceiling itself can't be changed → 400 |
+| PATCH | `/fare-rules/:id` | Admin | Change `baseTk`, `perKmTk` or `shareDiscountPercent` (amounts in Tk). Above the legal ceiling → 409; the ceiling itself can't be changed → 400 |
 
 ### Driver: Sumaiya Akter Roshni (`src/fleet`)
 

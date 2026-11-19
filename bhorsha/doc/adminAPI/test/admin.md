@@ -344,19 +344,19 @@ Some rules depend on **whose** data it is, not only on the role. `PATCH /users/:
 
 ### 6.13 Fare rules and the legal ceiling
 
-- **Money as integers:** all amounts are in **paisa** (Tk 1 = 100 paisa), stored as `bigint`, so there are no floating-point rounding errors. The share discount is in **basis points** (2500 bps = 25%).
-- **Current values** (from `GET /fare-rules`):
+- **Money:** the database stores every amount as whole **paisa** (Tk 1 = 100 paisa) in `bigint` columns, so there are no floating-point rounding errors. The API converts at the edge (`src/common/money.ts`): it shows and accepts **Tk** (up to 2 decimals), and the share discount in **percent** (the database keeps basis points, 2500 bps = 25%).
+- **Current values** (from `GET /fare-rules`, in Tk):
 
-  | id | Vehicle | Base fare | Per km | Ceiling base | Ceiling per km | Share discount |
+  | id | Vehicle | Base fare (`baseTk`) | Per km (`perKmTk`) | Ceiling base | Ceiling per km | Share discount |
   |---|---|---|---|---|---|---|
-  | 1 | BIKE | 3000 | 1200 | 4000 | 1800 | 2500 |
-  | 2 | CAR | 6000 | 2500 | 8500 | 3400 | 2500 |
-  | 3 | CNG | 4000 | 1800 | 5500 | 2500 | 2500 |
+  | 1 | BIKE | 30 | 12 | 40 | 18 | 25% |
+  | 2 | CAR | 60 | 25 | 85 | 34 | 25% |
+  | 3 | CNG | 40 | 18 | 55 | 25 | 25% |
 
 - **Two lines of defence:**
-  1. `FareRulesService.update()` compares the new values with the ceiling and returns **409** with the exact field and limit: `[{ "field": "perKmPaisa", "max": 1800 }]`.
+  1. `FareRulesService.update()` compares the new values with the ceiling and returns **409** with the exact field and limit in Tk: `[{ "field": "perKmTk", "max": 18 }]`.
   2. If code ever skipped that check, the database's `ck_fare_rules_within_ceiling` would still refuse the row, and the filter would turn it into the same 409.
-- **The ceiling is frozen.** Only `basePaisa`, `perKmPaisa` and `shareDiscountBps` can change. Sending `ceilingPerKmPaisa` gets a 400 from the ValidationPipe, and the database trigger `trg_fare_rules_regulation_frozen` blocks it too. The ceiling can only change through a migration.
+- **The ceiling is frozen.** Only `baseTk`, `perKmTk` and `shareDiscountPercent` can change (the API takes Tk; the database stores paisa). Sending `ceilingPerKmTk` gets a 400 from the ValidationPipe, and the database trigger `trg_fare_rules_regulation_frozen` blocks it too. The ceiling can only change through a migration.
 - `updatedBy` records which admin changed the fare.
 
 ### 6.14 Swagger with bearer authentication
@@ -733,9 +733,9 @@ Run against the running API with curl on 19 Nov 2026. Admin = `+8801700000001`, 
 | 23 | `PATCH /drivers/5/verify` REJECTED, no reason | admin | 400 | ✅ 400 | `rejectionReason is required when rejecting a driver` |
 | 24 | `PATCH /drivers/3/verify` (a rider's id) | admin | 404 | ✅ 404 | `Driver not found` |
 | 25 | `GET /fare-rules` | rider | 403 | ✅ 403 | admin only |
-| 26 | `PATCH /fare-rules/1` perKm 999999 | admin | 409 | ✅ 409 | `Fare is above the legal ceiling`, `max: 1800` |
-| 27 | `PATCH /fare-rules/1` send `ceilingPerKmPaisa` | admin | 400 | ✅ 400 | `property ceilingPerKmPaisa should not exist` |
-| 28 | `PATCH /fare-rules/1` empty body | admin | 400 | ✅ 400 | `Send at least one of basePaisa, perKmPaisa or shareDiscountBps` |
+| 26 | `PATCH /fare-rules/1` perKmTk 9999.99 | admin | 409 | ✅ 409 | `Fare is above the legal ceiling`, `max: 18` |
+| 27 | `PATCH /fare-rules/1` send `ceilingPerKmTk` | admin | 400 | ✅ 400 | `property ceilingPerKmTk should not exist` |
+| 28 | `PATCH /fare-rules/1` empty body | admin | 400 | ✅ 400 | `Send at least one of baseTk, perKmTk or shareDiscountPercent` |
 
 ### 8.4 How to run the tests again
 
@@ -877,7 +877,7 @@ About 5 minutes. Before the talk: `docker compose up -d`, `ALLOW_X_USER_ID=false
 | 5 | Log out in the dialog. Log in as admin `+8801700000001`, authorize, `GET /users` | "Same route, admin token, now it works, with paging." | 200 |
 | 6 | `GET /drivers?verification=PENDING` | "The admin's queue of drivers waiting for approval, oldest first." | 200 |
 | 7 | `PATCH /drivers/{id}/verify` with `{ "verification": "VERIFIED" }` | "Approve the driver. Running it again gives 409, because the update only applies if nobody reviewed the driver in between." | 200, then 409 |
-| 8 | `PATCH /fare-rules/1` with `{ "perKmPaisa": 999999 }` | "The admin can't set a fare above the BRTA ceiling. The service refuses, and the database would too." | 409 with `max: 1800` |
+| 8 | `PATCH /fare-rules/1` with `{ "perKmTk": 9999.99 }` | "The admin can't set a fare above the BRTA ceiling. The service refuses, and the database would too." | 409 with `max: 18` |
 | 9 | `POST /auth/register` with an extra field `"isAdmin": true` | "Unknown fields are refused, so nobody can sneak in a role." | 400 |
 
 If something in the demo was already done earlier (for example the driver is already verified), reset the data with `docker compose down -v && docker compose up -d`.

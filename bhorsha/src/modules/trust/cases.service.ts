@@ -20,9 +20,10 @@ import {
   optionalId,
   nonempty,
   oneOf,
-  paisa,
+  tkAsPaisa,
   limitOf,
 } from './input.js';
+import { paisaToTk } from '../../common/money.js';
 import {
   CaseType,
   CaseStatus,
@@ -30,6 +31,20 @@ import {
 
 const types = Object.values(CaseType);
 const statuses = Object.values(CaseStatus);
+
+/**
+ * A support case as the API shows it: the database's amount_claimed_paisa becomes amount_claimed_tk
+ * (same position in the row). Audit logs keep the raw database row.
+ */
+function caseView(row: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(row).map(([key, value]) =>
+      key === 'amount_claimed_paisa'
+        ? ['amount_claimed_tk', value === null ? null : paisaToTk(value as string)]
+        : [key, value],
+    ),
+  );
+}
 
 @Injectable()
 export class CasesService {
@@ -47,7 +62,7 @@ export class CasesService {
     const description = nonempty(body.description, 'description');
     const subjectId = optionalId(body.subjectId, 'subjectId');
     const rideId = optionalId(body.rideId, 'rideId');
-    const amount = paisa(body.amountClaimedPaisa);
+    const amount = tkAsPaisa(body.amountClaimedTk);
 
     if (subjectId === u.id) {
       throw new BadRequestException('Cannot report yourself');
@@ -55,7 +70,7 @@ export class CasesService {
 
     if (type === 'OVERCHARGE' && amount === null) {
       throw new BadRequestException(
-        'Overcharge needs amountClaimedPaisa',
+        'Overcharge needs amountClaimedTk',
       );
     }
 
@@ -82,7 +97,7 @@ export class CasesService {
         row,
       );
 
-      return row;
+      return caseView(row);
     });
   }
 
@@ -97,11 +112,12 @@ export class CasesService {
 
     args.push(limitOf(q.limit));
 
-    return this.db.query(
+    const rows: Record<string, unknown>[] = await this.db.query(
       `SELECT * FROM support_cases ${where}
        ORDER BY id DESC LIMIT $${args.length}`,
       args,
     );
+    return rows.map(caseView);
   }
 
   async one(u: Principal, id: number) {
@@ -116,7 +132,7 @@ export class CasesService {
 
     ownOrOfficer(u, row.reporter_id);
 
-    return row;
+    return caseView(row);
   }
 
   async update(
@@ -227,7 +243,7 @@ export class CasesService {
         row,
       );
 
-      return row;
+      return caseView(row);
     });
   }
 
@@ -275,7 +291,7 @@ export class CasesService {
         row,
       );
 
-      return row;
+      return caseView(row);
     });
   }
 }

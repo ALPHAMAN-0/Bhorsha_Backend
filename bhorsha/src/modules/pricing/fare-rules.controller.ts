@@ -26,7 +26,7 @@ export class FareRulesController {
   @ApiOperation({
     summary: 'Change a fare rule (Admin)',
     description:
-      'Only basePaisa, perKmPaisa and shareDiscountBps can change. Rates above the legal ceiling return 409.',
+      'Only baseTk, perKmTk and shareDiscountPercent can change (amounts in Tk, up to 2 decimals). Rates above the legal ceiling return 409.',
   })
   update(
     @CurrentUser() actor: AuthUser,

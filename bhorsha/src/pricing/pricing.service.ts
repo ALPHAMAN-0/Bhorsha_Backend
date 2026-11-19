@@ -2,25 +2,24 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { VehicleType } from '../fleet/vehicle-type.js';
+import { bpsToPercent, paisaToTk as toTk } from '../common/money.js';
 import { FareRule } from '../modules/pricing/entities/fare-rule.entity.js';
 
+/** All amounts are in Tk (BDT). The database stores paisa; it is converted here (Tk 1 = 100 paisa). */
 export interface QuoteResult {
   vehicle_type: VehicleType;
   distance_km: number;
   is_shared: boolean;
   base_fare_bdt: number;
-  per_km_bdt: number;
   base_distance_km: number;
+  per_km_bdt: number;
   subtotal_bdt: number;
+  shared_fare_bdt: number;
+  share_discount_percent: number;
   surge_multiplier: number;
   total_fare_bdt: number;
   fare_share_bdt: number;
   brta_ceiling_bdt: number;
-  share_discount_bps: number;
-  solo_fare_paisa: number;
-  shared_fare_paisa: number;
-  ceiling_paisa: number;
-  locked_fare_paisa: number;
   currency: string;
 }
 
@@ -67,19 +66,16 @@ export class PricingService {
       vehicle_type: vehicleType,
       distance_km: distanceKm,
       is_shared: isShared,
-      base_fare_bdt: rule.basePaisa / 100,
-      per_km_bdt: rule.perKmPaisa / 100,
+      base_fare_bdt: toTk(rule.basePaisa),
       base_distance_km: rule.baseDistanceM / 1000,
-      subtotal_bdt: soloPaisa / 100,
+      per_km_bdt: toTk(rule.perKmPaisa),
+      subtotal_bdt: toTk(soloPaisa),
+      shared_fare_bdt: toTk(sharedPaisa),
+      share_discount_percent: bpsToPercent(rule.shareDiscountBps),
       surge_multiplier: 1.0,
-      total_fare_bdt: soloLockedPaisa / 100,
-      fare_share_bdt: lockedPaisa / 100,
-      brta_ceiling_bdt: ceilingPaisa / 100,
-      share_discount_bps: rule.shareDiscountBps,
-      solo_fare_paisa: soloPaisa,
-      shared_fare_paisa: sharedPaisa,
-      ceiling_paisa: ceilingPaisa,
-      locked_fare_paisa: lockedPaisa,
+      total_fare_bdt: toTk(soloLockedPaisa),
+      fare_share_bdt: toTk(lockedPaisa),
+      brta_ceiling_bdt: toTk(ceilingPaisa),
       currency: 'BDT',
     };
   }
