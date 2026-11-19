@@ -2,19 +2,26 @@ import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { App } from 'supertest/types.js';
+import { DataSource } from 'typeorm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AppModule } from '../src/app.module.js';
-import { VehicleType } from '../src/fleet/vehicle-type.js';
-import { CreateRideDto } from '../src/trips/dto/create-ride.dto.js';
-import { JoinRequest } from '../src/trips/entities/join-request.entity.js';
-import { Ride } from '../src/trips/entities/ride.entity.js';
-import { TripsService } from '../src/trips/trips.service.js';
 
-describe('Numman Concurrency Suite: 50 Parallel Join Requests on 1 Last Seat (e2e)', () => {
+/**
+ * Seat transaction under load (Architecture v3.1): a driver's running shared CNG
+ * ride has exactly one free seat, 50 riders each have a pending request for it,
+ * and the driver accepts all 50 at once. Exactly one may win; the other 49 get
+ * 409 and roll back, so the seat is never oversold.
+ *
+ * It creates its own driver, vehicle, ride and 51 riders, so run it against a
+ * test database (DB_NAME=bhorsha_test), not your dev data. Needs ALLOW_X_USER_ID=true.
+ */
+describe('Seat concurrency: 50 parallel accepts on the last seat (e2e)', () => {
   let app: INestApplication<App>;
-  let tripsService: TripsService;
+  let db: DataSource;
 
   beforeAll(async () => {
+    // Requests must outlive the setup; the 12 s production default is for real riders.
+    process.env.RIDER_REQUEST_TTL_SECONDS = '600';
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     }).compile();
@@ -25,8 +32,7 @@ describe('Numman Concurrency Suite: 50 Parallel Join Requests on 1 Last Seat (e2
       new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }),
     );
     await app.init();
-
-    tripsService = moduleFixture.get<TripsService>(TripsService);
+    db = moduleFixture.get(DataSource);
   }, 30000);
 
   afterAll(async () => {
@@ -35,85 +41,98 @@ describe('Numman Concurrency Suite: 50 Parallel Join Requests on 1 Last Seat (e2
     }
   });
 
-  it('handles 50 concurrent join-request accept attempts on the final seat (1 winner, 49 rolled back with 409)', async () => {
-    // Step 1: Create a shared ride with exactly 2 seats (1 booked by rider, exactly 1 seat left)
-    const rideDto: CreateRideDto = {
-      origin: 'Banani 11',
-      destination: 'Gulshan 2',
-      origin_lat: 23.7925,
-      origin_lng: 90.4078,
-      dest_lat: 23.7915,
-      dest_lng: 90.4150,
-      distance_km: 3.5,
-      vehicle_type: VehicleType.CNG, // CNG has capacity of 2
-      is_shared: true,
-    };
+  it('lets exactly 1 of 50 concurrent accepts take the last seat (49 get 409)', async () => {
+    const run = String(Math.floor(Math.random() * 1e6)).padStart(6, '0');
+    const one = async <T>(sql: string, params: unknown[] = []): Promise<T> =>
+      (await db.query(sql, params))[0] as T;
 
-    const hostRiderId = 1;
-    const ride: Ride = await tripsService.createRide(hostRiderId, rideDto);
-    expect(ride).toBeDefined();
-    expect(ride.seats_total).toBe(2);
-    expect(ride.seats_booked).toBe(1); // 1 seat available
-
-    // Step 2: Create 50 distinct pending join requests from passengers 1001 to 1050
-    const joinRequests: JoinRequest[] = [];
-    for (let i = 1; i <= 50; i++) {
-      const passengerId = 1000 + i;
-      const joinReq = await tripsService.createJoinRequest(passengerId, {
-        ride_id: ride.id,
-        seats: 1,
-      });
-      joinRequests.push(joinReq);
-    }
-    expect(joinRequests.length).toBe(50);
-
-    // Step 3: Dispatch 50 accept requests concurrently using Promise.allSettled
-    console.log(`\n🚀 Launching 50 parallel requests to accept join requests on Ride #${ride.id}...`);
-    const startTime = Date.now();
-
-    const acceptPromises = joinRequests.map((req) =>
-      request(app.getHttpServer())
-        .post(`/api/v1/join-requests/${req.id}/accept`)
-        .set('x-user-id', String(hostRiderId))
-        .send(),
+    // A verified driver with a CNG (2 seats) on a running shared ride.
+    const driver = await one<{ id: number }>(
+      `INSERT INTO users (full_name, phone, password_hash, role)
+       VALUES ('Concurrency Driver', $1, 'x', 'DRIVER') RETURNING id`,
+      [`+88013${run}99`],
+    );
+    await db.query(
+      `INSERT INTO driver_profiles (user_id, licence_no, verification, reviewed_by, reviewed_at)
+       VALUES ($1, $2, 'VERIFIED', (SELECT id FROM users WHERE role = 'ADMIN' ORDER BY id LIMIT 1), now())`,
+      [driver.id, `CONC-${run}`],
+    );
+    const vehicle = await one<{ id: number }>(
+      `INSERT INTO vehicles (driver_id, type, reg_no, seats) VALUES ($1, 'CNG', $2, 2) RETURNING id`,
+      [driver.id, `CONC-${run}`],
+    );
+    const ride = await one<{ id: number }>(
+      `INSERT INTO rides (vehicle_type, is_shared, seats_total, seats_free, status,
+                          driver_id, vehicle_id, accepted_at)
+       VALUES ('CNG', true, 2, 1, 'ACCEPTED', $1, $2, now()) RETURNING id`,
+      [driver.id, vehicle.id],
     );
 
-    const results = await Promise.allSettled(acceptPromises);
-    const durationMs = Date.now() - startTime;
-    console.log(`⏱️ 50 parallel requests completed in ${durationMs}ms`);
-
-    // Step 4: Analyze response status codes
-    let successCount = 0;
-    let conflictCount = 0;
-    const otherErrors: any[] = [];
-
-    for (const res of results) {
-      if (res.status === 'fulfilled') {
-        const httpStatus = res.value.status;
-        if (httpStatus === 200 || httpStatus === 201) {
-          successCount++;
-        } else if (httpStatus === 409) {
-          conflictCount++;
-        } else {
-          otherErrors.push({ status: httpStatus, body: res.value.body });
-        }
-      } else {
-        otherErrors.push(res.reason);
-      }
+    // Riders: #0 already holds the first seat; #1..#50 compete for the last one.
+    const riders: number[] = [];
+    for (let i = 0; i <= 50; i++) {
+      const rider = await one<{ id: number }>(
+        `INSERT INTO users (full_name, phone, password_hash, role)
+         VALUES ($1, $2, 'x', 'RIDER') RETURNING id`,
+        [`Concurrency Rider ${i}`, `+88017${run}${String(i).padStart(2, '0')}`],
+      );
+      riders.push(rider.id);
     }
+    await db.query(
+      `INSERT INTO ride_passengers (ride_id, rider_id, seats, pickup_lat, pickup_lng, drop_lat, drop_lng,
+                                    distance_m, locked_fare_paisa, ceiling_paisa, pricing_snapshot, pickup_pin)
+       VALUES ($1, $2, 1, 23.7925, 90.4078, 23.7915, 90.4150, 3500, 7000, 9000, '{}'::jsonb, '1234')`,
+      [ride.id, riders[0]],
+    );
 
-    console.log(`📊 Concurrency Results:`);
-    console.log(`   - 201/200 Success (Seat Secured): ${successCount}`);
-    console.log(`   - 409 Conflict (Rolled Back):    ${conflictCount}`);
-    console.log(`   - Other / Unexpected:           ${otherErrors.length}`);
+    // Each competing rider asks to join through the API (quote, checks, PENDING request).
+    const requestIds: number[] = [];
+    for (const riderId of riders.slice(1)) {
+      const res = await request(app.getHttpServer())
+        .post('/api/v1/join-requests')
+        .set('x-user-id', String(riderId))
+        .send({
+          ride_id: ride.id,
+          pickup_lat: 23.7925,
+          pickup_lng: 90.4078,
+          dropoff_lat: 23.7915,
+          dropoff_lng: 90.415,
+          distance_km: 3.5,
+        });
+      expect(res.status).toBe(201);
+      requestIds.push(res.body.id ?? res.body.data?.id);
+    }
+    expect(requestIds).toHaveLength(50);
 
-    // Verification Assertions (Exact requirement of Architecture v3.1)
-    expect(successCount).toBe(1);
-    expect(conflictCount).toBe(49);
-    expect(otherErrors.length).toBe(0);
+    // The driver accepts all 50 at the same moment.
+    const startTime = Date.now();
+    const results = await Promise.allSettled(
+      requestIds.map((id) =>
+        request(app.getHttpServer())
+          .post(`/api/v1/join-requests/${id}/accept`)
+          .set('x-user-id', String(driver.id))
+          .send(),
+      ),
+    );
+    console.log(`50 parallel accepts on ride ${ride.id} took ${Date.now() - startTime} ms`);
 
-    // Step 5: Verify final state in database
-    const finalRide = await tripsService.findOne(ride.id);
-    expect(finalRide.seats_booked).toBe(2); // Exactly 2, never oversold!
-  }, 45000);
+    const statuses = results.map((r) => (r.status === 'fulfilled' ? r.value.status : 0));
+    const won = statuses.filter((s) => s === 200 || s === 201).length;
+    const conflicts = statuses.filter((s) => s === 409).length;
+    console.log(`won: ${won}, 409: ${conflicts}, other: ${50 - won - conflicts}`);
+    expect(won).toBe(1);
+    expect(conflicts).toBe(49);
+
+    // Never oversold: the ride is full, two live seats, and the books balance.
+    const final = await one<{ seats_free: number; live: number; accepted: number }>(
+      `SELECT r.seats_free,
+              (SELECT count(*)::int FROM ride_passengers p
+                WHERE p.ride_id = r.id AND p.status IN ('CONFIRMED', 'PICKED_UP')) AS live,
+              (SELECT count(*)::int FROM join_requests j
+                WHERE j.ride_id = r.id AND j.status = 'ACCEPTED') AS accepted
+         FROM rides r WHERE r.id = $1`,
+      [ride.id],
+    );
+    expect(final).toEqual({ seats_free: 0, live: 2, accepted: 1 });
+  }, 60000);
 });

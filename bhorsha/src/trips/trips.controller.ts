@@ -11,19 +11,22 @@ import {
   ApiHeader,
   ApiOperation,
   ApiQuery,
-  ApiSecurity,
   ApiTags,
 } from '@nestjs/swagger';
 import { CurrentUserId } from '../common/decorators/current-user-id.decorator.js';
+import { CurrentUser } from '../common/decorators/current-user.decorator.js';
+import { Roles } from '../common/decorators/roles.decorator.js';
+import { ApiPagination } from '../common/dto/page.js';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto.js';
+import type { AuthUser } from '../common/guards/auth-user.js';
 import { VehicleType } from '../fleet/vehicle-type.js';
 import { SafetyService } from '../safety/safety.service.js';
+import { Role } from '../users/entities/user.entity.js';
 import { CreateJoinRequestDto } from './dto/create-join-request.dto.js';
 import { CreateRatingDto } from './dto/create-rating.dto.js';
 import { CreateRideDto } from './dto/create-ride.dto.js';
 import { FindRidesQueryDto } from './dto/find-rides-query.dto.js';
 import { TriggerSosDto } from './dto/trigger-sos.dto.js';
-import { RideStatus } from './entities/ride.entity.js';
 import { TripsService } from './trips.service.js';
 
 @ApiTags('Rider Domain')
@@ -57,43 +60,52 @@ export class TripsController {
   }
 
   @Post('rides')
-  @ApiOperation({ summary: 'Create and request a new solo or shared ride' })
+  @ApiOperation({
+    summary: 'Book a solo or shared ride (Rider)',
+    description:
+      'Creates a REQUESTED ride and your seat on it, with the fare locked in Tk and a 4-digit pickup PIN ' +
+      'to tell the driver. Booking again replaces your own ride that no driver has accepted yet.',
+  })
   @ApiHeader({ name: 'x-user-id', description: 'Rider User ID', required: true, example: '1' })
-  createRide(@CurrentUserId() userId: number, @Body() dto: CreateRideDto) {
-    return this.tripsService.createRide(userId, dto);
+  createRide(@CurrentUser() user: AuthUser, @Body() dto: CreateRideDto) {
+    return this.tripsService.createRide(user, dto);
   }
 
   @Get('rides/my')
-  @ApiOperation({ summary: 'List my ride history (as rider or driver)' })
+  @ApiPagination()
+  @ApiOperation({ summary: 'List my rides, newest first (as rider or driver)' })
   @ApiHeader({ name: 'x-user-id', description: 'User ID', required: true, example: '1' })
-  findMyRides(
-    @CurrentUserId() userId: number,
-    @Query() query: PaginationQueryDto,
-  ) {
-    return this.tripsService.findMyRides(userId, query.page, query.limit);
+  findMyRides(@CurrentUser() user: AuthUser, @Query() query: PaginationQueryDto) {
+    return this.tripsService.findMyRides(user, query.page, query.limit);
   }
 
   @Get('rides')
+  @Roles(Role.ADMIN, Role.SUPPORT)
+  @ApiPagination()
   @ApiOperation({ summary: 'List all platform rides (Support / Admin oversight)' })
-  findAllRides(@Query() query: FindRidesQueryDto) {
-    return this.tripsService.findAllRides(query.status, query.page, query.limit);
+  findAllRides(@CurrentUser() user: AuthUser, @Query() query: FindRidesQueryDto) {
+    return this.tripsService.findAllRides(user, query.status, query.page, query.limit);
   }
 
   @Get('rides/:id')
-  @ApiOperation({ summary: 'Get details of a specific ride by ID' })
-  findOne(@Param('id') id: string) {
-    return this.tripsService.findOne(id);
+  @ApiOperation({ summary: 'Get one ride (its riders, its driver, or Admin / Support)' })
+  findOne(@CurrentUser() user: AuthUser, @Param('id', ParseIntPipe) id: number) {
+    return this.tripsService.findOne(user, id);
   }
 
   @Post('rides/:id/cancel')
-  @ApiOperation({ summary: 'Cancel a pending or active ride' })
+  @ApiOperation({
+    summary: 'Cancel: a rider cancels their seat before pickup; the driver cancels the whole ride',
+  })
   @ApiHeader({ name: 'x-user-id', description: 'Rider or Driver ID', required: true, example: '1' })
-  cancelRide(@CurrentUserId() userId: number, @Param('id') id: string) {
-    return this.tripsService.cancelRide(id, userId);
+  cancelRide(@CurrentUser() user: AuthUser, @Param('id', ParseIntPipe) id: number) {
+    return this.tripsService.cancelRide(user, id);
   }
 
   @Get('route-offers/nearby')
-  @ApiOperation({ summary: 'Find nearby shared rides open for carpooling / seat-sharing' })
+  @ApiOperation({
+    summary: 'Find nearby shared rides with free seats and open driver route offers to join',
+  })
   @ApiQuery({ name: 'lat', type: Number, required: false, example: 23.8103 })
   @ApiQuery({ name: 'lng', type: Number, required: false, example: 90.4125 })
   @ApiQuery({ name: 'radius_km', type: Number, required: false, example: 5.0 })
@@ -110,47 +122,44 @@ export class TripsController {
   }
 
   @Post('join-requests')
-  @ApiOperation({ summary: 'Submit request to join a shared ride' })
+  @ApiOperation({
+    summary: "Ask to join a driver's shared ride or route offer (Rider)",
+    description:
+      'Send exactly one of ride_id or route_offer_id. The shared fare is quoted in Tk and locked if the driver accepts.',
+  })
   @ApiHeader({ name: 'x-user-id', description: 'Passenger User ID', required: true, example: '2' })
-  createJoinRequest(
-    @CurrentUserId() userId: number,
-    @Body() dto: CreateJoinRequestDto,
-  ) {
-    return this.tripsService.createJoinRequest(userId, dto);
+  createJoinRequest(@CurrentUser() user: AuthUser, @Body() dto: CreateJoinRequestDto) {
+    return this.tripsService.createJoinRequest(user, dto);
   }
 
   @Get('join-requests/my')
-  @ApiOperation({ summary: 'View my submitted join requests' })
+  @ApiOperation({ summary: 'Join requests and invites I sent or received' })
   @ApiHeader({ name: 'x-user-id', description: 'Passenger User ID', required: true, example: '2' })
-  findMyJoinRequests(@CurrentUserId() userId: number) {
-    return this.tripsService.findMyJoinRequests(userId);
+  findMyJoinRequests(@CurrentUser() user: AuthUser) {
+    return this.tripsService.findMyJoinRequests(user);
   }
 
   @Post('join-requests/:id/accept')
-  @ApiOperation({ summary: 'Accept a join request (Atomic Pessimistic Lock for last seat)' })
-  @ApiHeader({ name: 'x-user-id', description: 'Ride Host / Driver User ID', required: true, example: '1' })
-  acceptJoinRequest(
-    @CurrentUserId() userId: number,
-    @Param('id', ParseIntPipe) id: number,
-  ) {
-    return this.tripsService.respondJoinRequest(id, userId, true);
+  @ApiOperation({
+    summary: "Accept a join request (driver) or an invite (rider): the seat transaction",
+  })
+  @ApiHeader({ name: 'x-user-id', description: 'Driver (for a request) or rider (for an invite)', required: true, example: '1' })
+  acceptJoinRequest(@CurrentUser() user: AuthUser, @Param('id', ParseIntPipe) id: number) {
+    return this.tripsService.respondJoinRequest(id, user, true);
   }
 
   @Post('join-requests/:id/decline')
-  @ApiOperation({ summary: 'Decline a join request' })
-  @ApiHeader({ name: 'x-user-id', description: 'Ride Host / Driver User ID', required: true, example: '1' })
-  declineJoinRequest(
-    @CurrentUserId() userId: number,
-    @Param('id', ParseIntPipe) id: number,
-  ) {
-    return this.tripsService.respondJoinRequest(id, userId, false);
+  @ApiOperation({ summary: 'Decline a join request (driver) or an invite (rider)' })
+  @ApiHeader({ name: 'x-user-id', description: 'Driver (for a request) or rider (for an invite)', required: true, example: '1' })
+  declineJoinRequest(@CurrentUser() user: AuthUser, @Param('id', ParseIntPipe) id: number) {
+    return this.tripsService.respondJoinRequest(id, user, false);
   }
 
   @Post('ratings')
-  @ApiOperation({ summary: 'Submit rating (1-5 stars) for a completed ride' })
+  @ApiOperation({ summary: 'Rate the driver or a co-rider (1-5 stars) after the trip' })
   @ApiHeader({ name: 'x-user-id', description: 'Rater User ID', required: true, example: '1' })
-  createRating(@CurrentUserId() userId: number, @Body() dto: CreateRatingDto) {
-    return this.tripsService.rateRide(userId, dto);
+  createRating(@CurrentUser() user: AuthUser, @Body() dto: CreateRatingDto) {
+    return this.tripsService.rateRide(user, dto);
   }
 
   @Post('rides/:id/sos')

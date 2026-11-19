@@ -1,49 +1,67 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsInt,
+  IsLatitude,
+  IsLongitude,
   IsNumber,
   IsOptional,
-  IsString,
   Max,
   Min,
 } from 'class-validator';
 
+/** Send exactly one of ride_id (a driver's running shared ride) or route_offer_id (a driver's "going this way" offer). */
 export class CreateJoinRequestDto {
-  @ApiProperty({
-    example: 5,
-    description: 'Target Ride ID to join',
+  @ApiPropertyOptional({
+    example: 4,
+    description: "A driver's running shared ride to join (from GET /route-offers/nearby, kind RIDE)",
   })
+  @IsOptional()
   @IsInt()
-  ride_id: number;
+  @Min(1)
+  ride_id?: number;
+
+  @ApiPropertyOptional({
+    example: 2,
+    description: "A driver's open route offer to join (from GET /route-offers/nearby, kind ROUTE_OFFER)",
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  route_offer_id?: number;
 
   @ApiPropertyOptional({
     example: 1,
-    description: 'Number of seats requested (1 to 3)',
+    description: 'Seats requested on a shared ride (1 or 2)',
     default: 1,
   })
   @IsOptional()
   @IsInt()
   @Min(1)
-  @Max(3)
+  @Max(2)
   seats?: number = 1;
 
-  @ApiPropertyOptional({ example: 23.7925, description: 'Pickup latitude' })
-  @IsOptional()
-  @IsNumber()
-  pickup_lat?: number;
+  @ApiProperty({ example: 23.8175, description: 'Pickup latitude' })
+  @IsLatitude()
+  pickup_lat: number;
 
-  @ApiPropertyOptional({ example: 90.4078, description: 'Pickup longitude' })
-  @IsOptional()
-  @IsNumber()
-  pickup_lng?: number;
+  @ApiProperty({ example: 90.4205, description: 'Pickup longitude' })
+  @IsLongitude()
+  pickup_lng: number;
 
-  @ApiPropertyOptional({ example: 23.7915, description: 'Dropoff latitude' })
-  @IsOptional()
-  @IsNumber()
-  dropoff_lat?: number;
+  @ApiProperty({ example: 23.7915, description: 'Drop-off latitude' })
+  @IsLatitude()
+  dropoff_lat: number;
 
-  @ApiPropertyOptional({ example: 90.415, description: 'Dropoff longitude' })
+  @ApiProperty({ example: 90.415, description: 'Drop-off longitude' })
+  @IsLongitude()
+  dropoff_lng: number;
+
+  @ApiPropertyOptional({
+    example: 3.2,
+    description: 'Your route distance in km. Leave it out to use the straight-line distance.',
+  })
   @IsOptional()
   @IsNumber()
-  dropoff_lng?: number;
+  @Min(0.5)
+  distance_km?: number;
 }

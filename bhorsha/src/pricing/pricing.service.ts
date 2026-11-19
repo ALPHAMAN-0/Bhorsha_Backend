@@ -23,6 +23,20 @@ export interface QuoteResult {
   currency: string;
 }
 
+/** A priced trip in paisa, ready to store (locked fare, ceiling and the snapshot that proves them). */
+export interface TripPrice {
+  rule: FareRule;
+  distanceM: number;
+  isShared: boolean;
+  soloPaisa: number;
+  sharedPaisa: number;
+  ceilingPaisa: number;
+  /** min(shared or solo, ceiling): what this passenger pays. */
+  farePaisa: number;
+  /** Rule, inputs, discount and ceiling used: stored as pricing_snapshot (dispute evidence). */
+  snapshot: Record<string, unknown>;
+}
+
 @Injectable()
 export class PricingService {
   constructor(
@@ -37,12 +51,12 @@ export class PricingService {
    *   shared  = round(solo * (10000 - share_discount_bps) / 10000)
    *   locked  = min(shared or solo, ceiling)
    */
-  async calculateQuote(
+  async priceTrip(
     vehicleType: VehicleType,
-    distanceKm: number,
-    isShared: boolean = false,
-  ): Promise<QuoteResult> {
-    if (!Number.isFinite(distanceKm) || distanceKm <= 0) {
+    distanceM: number,
+    isShared: boolean,
+  ): Promise<TripPrice> {
+    if (!Number.isFinite(distanceM) || distanceM <= 0) {
       throw new BadRequestException('distance_km must be a positive number');
     }
     // A one-seat vehicle (BIKE) is never shared: the database's ck_rides_bike_solo refuses it too.
@@ -57,16 +71,50 @@ export class PricingService {
       throw new NotFoundException(`No fare rule for vehicle type ${vehicleType}`);
     }
 
-    const distanceM = Math.round(distanceKm * 1000);
     const extraM = Math.max(distanceM - rule.baseDistanceM, 0);
-
     const soloPaisa = rule.basePaisa + Math.round((rule.perKmPaisa * extraM) / 1000);
     const ceilingPaisa =
       rule.ceilingBasePaisa + Math.round((rule.ceilingPerKmPaisa * extraM) / 1000);
     const sharedPaisa = Math.round((soloPaisa * (10000 - rule.shareDiscountBps)) / 10000);
+    const farePaisa = Math.min(isShared ? sharedPaisa : soloPaisa, ceilingPaisa);
 
-    const soloLockedPaisa = Math.min(soloPaisa, ceilingPaisa);
-    const lockedPaisa = Math.min(isShared ? sharedPaisa : soloPaisa, ceilingPaisa);
+    return {
+      rule,
+      distanceM,
+      isShared,
+      soloPaisa,
+      sharedPaisa,
+      ceilingPaisa,
+      farePaisa,
+      snapshot: {
+        shared: isShared,
+        vehicleType,
+        distanceM,
+        fareRuleId: rule.id,
+        basePaisa: rule.basePaisa,
+        perKmPaisa: rule.perKmPaisa,
+        baseDistanceM: rule.baseDistanceM,
+        shareDiscountBps: rule.shareDiscountBps,
+        ceilingBasePaisa: rule.ceilingBasePaisa,
+        ceilingPerKmPaisa: rule.ceilingPerKmPaisa,
+        soloFarePaisa: soloPaisa,
+        ceilingPaisa,
+        farePaisa,
+      },
+    };
+  }
+
+  /** The same price as priceTrip, shown in Tk for GET /rides/quote. */
+  async calculateQuote(
+    vehicleType: VehicleType,
+    distanceKm: number,
+    isShared: boolean = false,
+  ): Promise<QuoteResult> {
+    if (!Number.isFinite(distanceKm) || distanceKm <= 0) {
+      throw new BadRequestException('distance_km must be a positive number');
+    }
+    const price = await this.priceTrip(vehicleType, Math.round(distanceKm * 1000), isShared);
+    const { rule } = price;
 
     return {
       vehicle_type: vehicleType,
@@ -75,13 +123,13 @@ export class PricingService {
       base_fare_bdt: toTk(rule.basePaisa),
       base_distance_km: rule.baseDistanceM / 1000,
       per_km_bdt: toTk(rule.perKmPaisa),
-      subtotal_bdt: toTk(soloPaisa),
-      shared_fare_bdt: toTk(sharedPaisa),
+      subtotal_bdt: toTk(price.soloPaisa),
+      shared_fare_bdt: toTk(price.sharedPaisa),
       share_discount_percent: bpsToPercent(rule.shareDiscountBps),
       surge_multiplier: 1.0,
-      total_fare_bdt: toTk(soloLockedPaisa),
-      fare_share_bdt: toTk(lockedPaisa),
-      brta_ceiling_bdt: toTk(ceilingPaisa),
+      total_fare_bdt: toTk(Math.min(price.soloPaisa, price.ceilingPaisa)),
+      fare_share_bdt: toTk(price.farePaisa),
+      brta_ceiling_bdt: toTk(price.ceilingPaisa),
       currency: 'BDT',
     };
   }

@@ -1,39 +1,29 @@
 import {
-  Check,
   Column,
   CreateDateColumn,
   Entity,
   PrimaryGeneratedColumn,
 } from 'typeorm';
 
+/** One rating per direction per ride (uq_ratings_ride_from_to); 1 to 5 stars; never yourself. */
 @Entity('ratings')
-@Check('"score" BETWEEN 1 AND 5')
 export class Rating {
-  @PrimaryGeneratedColumn()
+  @PrimaryGeneratedColumn('identity', { generatedIdentity: 'ALWAYS' })
   id: number;
 
-  @Column({ type: 'int' })
+  @Column({ type: 'integer' })
   ride_id: number;
 
-  @Column({ type: 'int', nullable: true })
-  from_user_id: number | null;
+  @Column({ type: 'integer' })
+  from_user_id: number;
 
-  @Column({ type: 'int', nullable: true })
-  to_user_id: number | null;
-
-  @Column({ type: 'int' })
-  rater_id: number;
-
-  @Column({ type: 'int' })
-  ratee_id: number;
-
-  @Column({ type: 'smallint', nullable: true })
-  stars: number | null;
+  @Column({ type: 'integer' })
+  to_user_id: number;
 
   @Column({ type: 'smallint' })
-  score: number;
+  stars: number;
 
-  @Column({ type: 'text', nullable: true })
+  @Column({ type: 'varchar', length: 500, nullable: true })
   comment: string | null;
 
   @CreateDateColumn({ type: 'timestamptz' })
