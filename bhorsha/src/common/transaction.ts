@@ -18,16 +18,19 @@ export class Tx {
   }
 }
 
-/** Runs work in one transaction: commit when it returns, roll back when it throws. */
-export async function inTransaction<T>(
-  dataSource: DataSource,
-  work: (tx: Tx) => Promise<T>,
+/**
+ * Runs work on one QueryRunner inside a transaction: commit when it returns,
+ * roll back when it throws, and release the connection either way.
+ */
+export async function runInTransaction<T>(
+  dataSource: Pick<DataSource, 'createQueryRunner'>,
+  work: (runner: QueryRunner) => Promise<T>,
 ): Promise<T> {
   const runner = dataSource.createQueryRunner();
   await runner.connect();
   await runner.startTransaction();
   try {
-    const result = await work(new Tx(runner));
+    const result = await work(runner);
     await runner.commitTransaction();
     return result;
   } catch (error) {
@@ -36,4 +39,12 @@ export async function inTransaction<T>(
   } finally {
     await runner.release();
   }
+}
+
+/** The same, with a Tx that always returns rows (see Tx). */
+export function inTransaction<T>(
+  dataSource: Pick<DataSource, 'createQueryRunner'>,
+  work: (tx: Tx) => Promise<T>,
+): Promise<T> {
+  return runInTransaction(dataSource, (runner) => work(new Tx(runner)));
 }

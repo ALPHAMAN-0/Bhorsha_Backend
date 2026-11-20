@@ -23,6 +23,7 @@ import {
   futureDate,
 } from '../../common/input.js';
 import { StrikeStatus } from './entities/strike.entity.js';
+import { lockCase, lockStrike } from './locks.js';
 
 @Injectable()
 export class StrikesService {
@@ -49,14 +50,7 @@ export class StrikesService {
     }
 
     return this.db.transaction(async (m) => {
-      const [c] = await m.query(
-        'SELECT * FROM support_cases WHERE id=$1 FOR UPDATE',
-        [caseId],
-      );
-
-      if (!c) {
-        throw new NotFoundException('Case not found');
-      }
+      const c = await lockCase(m, caseId);
 
       if (c.status !== 'UPHELD') {
         throw new ConflictException(
@@ -153,14 +147,7 @@ export class StrikesService {
     }
 
     return this.db.transaction(async (m) => {
-      const [old] = await m.query(
-        'SELECT * FROM strikes WHERE id=$1 FOR UPDATE',
-        [id],
-      );
-
-      if (!old) {
-        throw new NotFoundException('Strike not found');
-      }
+      const old = await lockStrike(m, id);
 
       if (old.status !== 'ACTIVE') {
         throw new ConflictException(
@@ -220,14 +207,7 @@ export class StrikesService {
     officer(u);
 
     return this.db.transaction(async (m) => {
-      const [old] = await m.query(
-        'SELECT * FROM strikes WHERE id=$1 FOR UPDATE',
-        [id],
-      );
-
-      if (!old) {
-        throw new NotFoundException('Strike not found');
-      }
+      const old = await lockStrike(m, id);
 
       if (old.status !== 'ACTIVE') {
         throw new ConflictException(

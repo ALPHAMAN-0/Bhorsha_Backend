@@ -300,14 +300,14 @@ bhorsha/
 │   ├── app.setup.ts             /api/v1 prefix, ValidationPipe, interceptors (shared with the e2e tests)
 │   ├── app.module.ts            config, TypeORM (synchronize off), every module, the global filter
 │   ├── common/
-│   │   ├── decorators/          @Public(), @Roles(), @CurrentUser() (Siam); @CurrentUserId() (shared)
+│   │   ├── decorators/          @Public(), @Roles(), @CurrentUser() (Siam); @CurrentUserId(), @ApiDriverDomain() (shared)
 │   │   ├── dto/                 PaginationQueryDto (Roshni); Page<T>, @ApiPagination() (Siam); LIMIT_QUERY (Anyka)
 │   │   ├── filters/             global exception filter and the PostgreSQL error map (Siam)
 │   │   ├── guards/              JwtAuthGuard, RolesGuard (Siam); support-auth.ts (Anyka)
 │   │   ├── interceptors/        timing and the response envelope (Roshni)
 │   │   ├── input.ts             body checks for the support endpoints (Anyka)
 │   │   ├── money.ts             Tk <-> paisa
-│   │   └── transaction.ts       Tx: one transaction that two modules write in (the seat transaction)
+│   │   └── transaction.ts       runInTransaction(); Tx lets two modules write in one transaction (the seat transaction)
 │   ├── config/                  env validation (Numman)
 │   └── modules/                 the modules of the architecture (root README section 8)
 │       ├── identity/            users: auth, users, driver verification (Siam); User entity (Roshni)

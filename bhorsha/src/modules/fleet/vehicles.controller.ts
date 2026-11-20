@@ -11,20 +11,15 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
-import { ApiHeader, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiOperation } from '@nestjs/swagger';
+import { ApiDriverDomain } from '../../common/decorators/api-driver-domain.decorator.js';
 import { CurrentUserId } from '../../common/decorators/current-user-id.decorator.js';
 import { PaginationQueryDto } from '../../common/dto/pagination-query.dto.js';
 import { CreateVehicleDto } from './dto/create-vehicle.dto.js';
 import { UpdateVehicleDto } from './dto/update-vehicle.dto.js';
 import { VehiclesService } from './vehicles.service.js';
 
-@ApiTags('Driver Domain')
-@ApiHeader({
-  name: 'x-user-id',
-  description: 'Who is calling (user ID). Leave empty to see 401',
-  required: false,
-  example: '5',
-})
+@ApiDriverDomain()
 @Controller('vehicles')
 export class VehiclesController {
   constructor(private readonly vehiclesService: VehiclesService) {}

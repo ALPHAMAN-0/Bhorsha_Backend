@@ -1,7 +1,7 @@
 import { UnauthorizedException } from '@nestjs/common';
 import type { Request } from 'express';
 import type { Repository } from 'typeorm';
-import type { Role, User } from '../../modules/identity/entities/user.entity.js';
+import { Role, type User } from '../../modules/identity/entities/user.entity.js';
 
 /** The logged-in user that the global JwtAuthGuard puts on request.user. */
 export interface AuthUser {
@@ -31,4 +31,9 @@ export async function loadAuthUser(
     throw new UnauthorizedException('Account not found or deactivated');
   }
   return { id: user.id, role: user.role, suspendedUntil: user.suspendedUntil };
+}
+
+/** Admins and Support Officers: the staff who may see and manage everyone's records. */
+export function isStaff(user: { role: string }): boolean {
+  return user.role === Role.ADMIN || user.role === Role.SUPPORT;
 }

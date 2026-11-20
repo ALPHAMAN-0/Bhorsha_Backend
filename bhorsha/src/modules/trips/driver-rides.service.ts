@@ -12,15 +12,16 @@ import {
   QueryRunner,
 } from 'typeorm';
 import { paisaToTk } from '../../common/money.js';
+import { runInTransaction } from '../../common/transaction.js';
 import { DriversService } from '../fleet/drivers.service.js';
 import { DriverAvailability } from '../fleet/entities/driver-profile.entity.js';
 import { VehiclesService } from '../fleet/vehicles.service.js';
+import { RUNNING_RIDE_STATUSES } from './trip-views.js';
 
 const SEARCH_RADIUS_KM = 3;
 const OPEN_REQUEST_WINDOW = '10 minutes';
 const MAX_RESULTS = 20;
 const ACTIVE_RIDE_INDEX = 'uq_rides_one_active_per_driver';
-const PICKUP_STATUSES = ['ACCEPTED', 'ARRIVED', 'IN_PROGRESS'];
 
 const OPEN_RIDES_SQL = `
 SELECT r.id AS "rideId",
@@ -249,7 +250,7 @@ export class DriverRidesService {
       throw new ForbiddenException('Go online to accept rides');
     }
 
-    return this.inTransaction(async (runner) => {
+    return runInTransaction(this.dataSource, async (runner) => {
       const ride = await this.lockRide(runner, rideId);
       if (ride.status !== 'REQUESTED') {
         throw new ConflictException('Ride is no longer available');
@@ -266,7 +267,7 @@ export class DriverRidesService {
   async arrive(userId: number, rideId: number): Promise<Arrival> {
     await this.driversService.findMe(userId);
 
-    return this.inTransaction(async (runner) => {
+    return runInTransaction(this.dataSource, async (runner) => {
       const ride = await this.lockRideForPickup(runner, rideId, userId);
       const result: QueryResult = await runner.query(
         MARK_ARRIVAL_SQL,
@@ -289,7 +290,7 @@ export class DriverRidesService {
   ): Promise<Pickup> {
     await this.driversService.findMe(userId);
 
-    return this.inTransaction(async (runner) => {
+    return runInTransaction(this.dataSource, async (runner) => {
       const ride = await this.lockRideForPickup(runner, rideId, userId);
       await this.checkPassenger(runner, rideId, passengerId, pin);
       const result: QueryResult = await runner.query(
@@ -314,7 +315,7 @@ export class DriverRidesService {
   ): Promise<DropOff> {
     await this.driversService.findMe(userId);
 
-    return this.inTransaction(async (runner) => {
+    return runInTransaction(this.dataSource, async (runner) => {
       const ride = await this.lockOwnRide(runner, rideId, userId);
       if (ride.status !== 'IN_PROGRESS') {
         throw new ConflictException('This ride is not in progress');
@@ -334,24 +335,6 @@ export class DriverRidesService {
         droppedAt: dropped.droppedAt,
       };
     });
-  }
-
-  private async inTransaction<T>(
-    work: (runner: QueryRunner) => Promise<T>,
-  ): Promise<T> {
-    const runner = this.dataSource.createQueryRunner();
-    await runner.connect();
-    await runner.startTransaction();
-    try {
-      const result = await work(runner);
-      await runner.commitTransaction();
-      return result;
-    } catch (error) {
-      await runner.rollbackTransaction();
-      throw error;
-    } finally {
-      await runner.release();
-    }
   }
 
   private async lockRide(
@@ -383,7 +366,7 @@ export class DriverRidesService {
     userId: number,
   ): Promise<LockedRide> {
     const ride = await this.lockOwnRide(runner, rideId, userId);
-    if (!PICKUP_STATUSES.includes(ride.status)) {
+    if (!RUNNING_RIDE_STATUSES.includes(ride.status)) {
       throw new ConflictException('This ride is not waiting for a pickup');
     }
     return ride;

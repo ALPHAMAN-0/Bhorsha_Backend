@@ -1,5 +1,6 @@
 import { ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import type { Request } from 'express';
+import { isStaff } from './auth-user.js';
 
 // The identity team's verified JWT guard must populate request.user.
 // Never trust x-user-id/x-role supplied directly by a browser.
@@ -14,7 +15,7 @@ export function principal(req: AuthRequest): Principal {
   return { id, role: u.role as Principal['role'] };
 }
 export function officer(u: Principal): void {
-  if (u.role !== 'SUPPORT' && u.role !== 'ADMIN') throw new ForbiddenException('Support/Admin only');
+  if (!isStaff(u)) throw new ForbiddenException('Support/Admin only');
 }
 export function ownOrOfficer(u: Principal, id: number): void {
   if (u.id !== id) officer(u);

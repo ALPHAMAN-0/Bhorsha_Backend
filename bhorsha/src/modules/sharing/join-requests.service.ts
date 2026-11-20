@@ -275,7 +275,7 @@ export class JoinRequestsService {
       }
 
       // 5. The proposal becomes a seat with the quoted fare locked in.
-      const seat = await this.ridesService.addRequestSeat(tx, {
+      const seat = await this.ridesService.insertSeat(tx, {
         rideId: targetRideId,
         riderId: request.rider_id,
         joinRequestId: request.id,

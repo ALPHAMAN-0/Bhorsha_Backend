@@ -1,7 +1,6 @@
 import { randomInt } from 'node:crypto';
-import type { AuthUser } from '../../common/guards/auth-user.js';
+import { type AuthUser, isStaff } from '../../common/guards/auth-user.js';
 import { paisaToTk } from '../../common/money.js';
-import { Role } from '../identity/entities/user.entity.js';
 
 /**
  * Row shapes as raw SQL returns them (parseInt8 is on, so bigint is a number;
@@ -91,11 +90,10 @@ export interface RideView {
 }
 
 export const LIVE_SEAT_STATUSES = ['CONFIRMED', 'PICKED_UP'];
+/** A ride with its driver that has not finished yet. */
 export const RUNNING_RIDE_STATUSES = ['ACCEPTED', 'ARRIVED', 'IN_PROGRESS'];
-
-export function isStaff(user: AuthUser): boolean {
-  return user.role === Role.ADMIN || user.role === Role.SUPPORT;
-}
+/** A ride that still holds its driver's vehicle: running, or waiting for a handover. */
+export const ACTIVE_RIDE_STATUSES = [...RUNNING_RIDE_STATUSES, 'AWAITING_HANDOVER'];
 
 /** A new 4-digit pickup PIN (0000-9999), from a secure random source. */
 export function newPickupPin(): string {

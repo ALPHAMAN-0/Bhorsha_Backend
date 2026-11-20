@@ -15,6 +15,7 @@ import {
   officer,
 } from '../../common/guards/support-auth.js';
 import { nonempty, oneOf } from '../../common/input.js';
+import { lockStrike } from './locks.js';
 
 @Injectable()
 export class AppealsService {
@@ -32,14 +33,7 @@ export class AppealsService {
     const statement = nonempty(body.statement, 'statement');
 
     return this.db.transaction(async (m) => {
-      const [strike] = await m.query(
-        'SELECT * FROM strikes WHERE id=$1 FOR UPDATE',
-        [strikeId],
-      );
-
-      if (!strike) {
-        throw new NotFoundException('Strike not found');
-      }
+      const strike = await lockStrike(m, strikeId);
 
       if (strike.user_id !== u.id) {
         throw new ForbiddenException(
@@ -137,10 +131,7 @@ export class AppealsService {
           );
         }
 
-        const [before] = await m.query(
-          'SELECT * FROM strikes WHERE id=$1 FOR UPDATE',
-          [old.strike_id],
-        );
+        const before = await lockStrike(m, old.strike_id);
 
         // Fixed: extract updated strike row correctly
         const strikeResult = await m.query(

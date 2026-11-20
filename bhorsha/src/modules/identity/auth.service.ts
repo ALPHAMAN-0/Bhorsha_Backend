@@ -8,6 +8,7 @@ import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
+import { runInTransaction } from '../../common/transaction.js';
 import { DriverProfile } from '../fleet/entities/driver-profile.entity.js';
 import { Role, User } from './entities/user.entity.js';
 import type { LoginDto } from './dto/login.dto.js';
@@ -104,10 +105,7 @@ export class AuthService {
     dto: RegisterDto,
     passwordHash: string,
   ): Promise<number> {
-    const runner = this.dataSource.createQueryRunner();
-    await runner.connect();
-    await runner.startTransaction();
-    try {
+    return runInTransaction(this.dataSource, async (runner) => {
       const inserted = await runner.manager.insert(User, {
         fullName: dto.fullName,
         phone: dto.phone,
@@ -123,14 +121,8 @@ export class AuthService {
           licenceNo: dto.licenceNo,
         });
       }
-      await runner.commitTransaction();
       return userId;
-    } catch (error) {
-      await runner.rollbackTransaction();
-      throw error;
-    } finally {
-      await runner.release();
-    }
+    });
   }
 
   private async findRegistered(id: number): Promise<RegisteredUser> {

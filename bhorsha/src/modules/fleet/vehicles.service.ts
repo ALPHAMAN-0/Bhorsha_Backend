@@ -7,18 +7,12 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, Repository } from 'typeorm';
 import { PaginationQueryDto } from '../../common/dto/pagination-query.dto.js';
+import { ACTIVE_RIDE_STATUSES } from '../trips/trip-views.js';
 import { CreateVehicleDto } from './dto/create-vehicle.dto.js';
 import { UpdateVehicleDto } from './dto/update-vehicle.dto.js';
 import { DriverProfile } from './entities/driver-profile.entity.js';
 import { Vehicle } from './entities/vehicle.entity.js';
 import { SEAT_CAPACITY, type VehicleType } from './vehicle-type.js';
-
-const ACTIVE_RIDE_STATUSES = [
-  'ACCEPTED',
-  'ARRIVED',
-  'IN_PROGRESS',
-  'AWAITING_HANDOVER',
-];
 
 const ACTIVE_RIDE_FOR_VEHICLE_SQL = `
 SELECT id

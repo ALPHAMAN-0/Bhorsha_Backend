@@ -6,16 +6,12 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { DataSource, QueryResult, QueryRunner } from 'typeorm';
+import { runInTransaction } from '../../common/transaction.js';
 import { DriversService } from '../fleet/drivers.service.js';
+import { ACTIVE_RIDE_STATUSES } from '../trips/trip-views.js';
 import { CreateRouteOfferDto } from './dto/create-route-offer.dto.js';
 
 const DEFAULT_VALID_MINUTES = 60;
-const ACTIVE_RIDE_STATUSES = [
-  'ACCEPTED',
-  'ARRIVED',
-  'IN_PROGRESS',
-  'AWAITING_HANDOVER',
-];
 
 const OFFER_COLUMNS = `
   id, driver_id AS "driverId", ride_id AS "rideId", vehicle_id AS "vehicleId",
@@ -141,7 +137,7 @@ export class RouteOffersService {
       throw new BadRequestException('Start and end must be different places');
     }
 
-    return this.inTransaction(async (runner) => {
+    return runInTransaction(this.dataSource, async (runner) => {
       await this.lockOnlineDriver(runner, userId);
       const vehicle = await this.findOwnVehicle(runner, userId, dto);
       await this.assertNoLiveOffer(runner, userId);
@@ -153,7 +149,7 @@ export class RouteOffersService {
   async withdraw(userId: number, offerId: number): Promise<Withdrawal> {
     await this.driversService.findMe(userId);
 
-    return this.inTransaction(async (runner) => {
+    return runInTransaction(this.dataSource, async (runner) => {
       const offer = await this.lockOffer(runner, offerId);
       if (offer.driverId !== userId) {
         throw new ForbiddenException(
@@ -174,24 +170,6 @@ export class RouteOffersService {
       );
       return { ...result.records[0], expiredRequests: expired.records.length };
     });
-  }
-
-  private async inTransaction<T>(
-    work: (runner: QueryRunner) => Promise<T>,
-  ): Promise<T> {
-    const runner = this.dataSource.createQueryRunner();
-    await runner.connect();
-    await runner.startTransaction();
-    try {
-      const result = await work(runner);
-      await runner.commitTransaction();
-      return result;
-    } catch (error) {
-      await runner.rollbackTransaction();
-      throw error;
-    } finally {
-      await runner.release();
-    }
   }
 
   private async lockOnlineDriver(

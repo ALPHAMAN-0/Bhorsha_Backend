@@ -28,6 +28,7 @@ import {
   CaseType,
   CaseStatus,
 } from './entities/support-case.entity.js';
+import { lockCase } from './locks.js';
 
 const types = Object.values(CaseType);
 const statuses = Object.values(CaseStatus);
@@ -155,14 +156,7 @@ export class CasesService {
     }
 
     return this.db.transaction(async (m) => {
-      const [old] = await m.query(
-        'SELECT * FROM support_cases WHERE id=$1 FOR UPDATE',
-        [id],
-      );
-
-      if (!old) {
-        throw new NotFoundException('Case not found');
-      }
+      const old = await lockCase(m, id);
 
       if (['UPHELD', 'DISMISSED', 'WITHDRAWN'].includes(old.status)) {
         throw new ConflictException('Case already closed');
@@ -253,14 +247,7 @@ export class CasesService {
     id: number,
   ) {
     return this.db.transaction(async (m) => {
-      const [old] = await m.query(
-        'SELECT * FROM support_cases WHERE id=$1 FOR UPDATE',
-        [id],
-      );
-
-      if (!old) {
-        throw new NotFoundException('Case not found');
-      }
+      const old = await lockCase(m, id);
 
       ownOrOfficer(u, old.reporter_id);
 

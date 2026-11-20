@@ -1,16 +1,11 @@
 import { Body, Controller, Param, ParseIntPipe, Post } from '@nestjs/common';
-import { ApiHeader, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiOperation } from '@nestjs/swagger';
+import { ApiDriverDomain } from '../../common/decorators/api-driver-domain.decorator.js';
 import { CurrentUserId } from '../../common/decorators/current-user-id.decorator.js';
 import { CreateInviteDto } from './dto/create-invite.dto.js';
 import { RideInvitesService } from './ride-invites.service.js';
 
-@ApiTags('Driver Domain')
-@ApiHeader({
-  name: 'x-user-id',
-  description: 'Who is calling (user ID). Leave empty to see 401',
-  required: false,
-  example: '5',
-})
+@ApiDriverDomain()
 @Controller('rides')
 export class RideInvitesController {
   constructor(private readonly rideInvitesService: RideInvitesService) {}

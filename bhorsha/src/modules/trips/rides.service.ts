@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import type { Page } from '../../common/dto/page.js';
-import type { AuthUser } from '../../common/guards/auth-user.js';
+import { type AuthUser, isStaff } from '../../common/guards/auth-user.js';
 import { inTransaction, type Tx } from '../../common/transaction.js';
 import { SEAT_CAPACITY, VehicleType } from '../fleet/vehicle-type.js';
 import { Role } from '../identity/entities/user.entity.js';
@@ -19,7 +19,6 @@ import {
   type RideRow,
   type RideView,
   LIVE_SEAT_STATUSES,
-  isStaff,
   newPickupPin,
   toRideView,
   tripMeters,
@@ -70,11 +69,11 @@ export interface OfferRide {
   vehicleId: number;
 }
 
-/** A seat made from an accepted join request: its stops, and its quoted fare locked in. */
-export interface RequestSeat {
+/** A new seat: the rider's stops and fare, locked in (a booking's own fare or a join request's quote). */
+export interface NewSeat {
   rideId: number;
   riderId: number;
-  joinRequestId: number;
+  joinRequestId: number | null;
   seats: number;
   pickupLat: number | string;
   pickupLng: number | string;
@@ -145,21 +144,20 @@ export class RidesService {
         seatsTotal,
         seatsFree,
       ]))!;
-      const seat = (await tx.one<PassengerRow>(INSERT_PASSENGER_SQL, [
-        ride.id,
-        user.id,
-        null,
+      const seat = await this.insertSeat(tx, {
+        rideId: ride.id,
+        riderId: user.id,
+        joinRequestId: null,
         seats,
-        pickup.lat,
-        pickup.lng,
-        drop.lat,
-        drop.lng,
+        pickupLat: pickup.lat,
+        pickupLng: pickup.lng,
+        dropLat: drop.lat,
+        dropLng: drop.lng,
         distanceM,
-        price.farePaisa,
-        price.ceilingPaisa,
-        JSON.stringify(snapshot),
-        newPickupPin(),
-      ]))!;
+        farePaisa: price.farePaisa,
+        ceilingPaisa: price.ceilingPaisa,
+        pricingSnapshot: snapshot,
+      });
       return toRideView(ride, [seat], user);
     });
   }
@@ -359,8 +357,11 @@ export class RidesService {
     await tx.rows(CANCEL_RIDE_SQL, [ride.id, reason]);
   }
 
-  /** Step 5: the proposal becomes a seat with the quoted fare locked in, and a new PIN. */
-  async addRequestSeat(tx: Tx, seat: RequestSeat): Promise<PassengerRow> {
+  /**
+   * Inserts a seat with its fare locked in and a new pickup PIN: a booking's own
+   * seat, or step 5 of the seat transaction (the proposal becomes a seat).
+   */
+  async insertSeat(tx: Tx, seat: NewSeat): Promise<PassengerRow> {
     return (await tx.one<PassengerRow>(INSERT_PASSENGER_SQL, [
       seat.rideId,
       seat.riderId,
