@@ -83,6 +83,22 @@ describe('AllExceptionsFilter', () => {
     expect(body.error.code).toBe('FORBIDDEN');
   });
 
+  it('maps a number the column cannot hold (an id above 2147483647) to 400', () => {
+    const { status, body } = run(pgError('22003'));
+    expect(status).toBe(400);
+    expect(body.error).toEqual({
+      code: 'BAD_REQUEST',
+      message: 'A number in the request is out of range',
+      details: null,
+    });
+  });
+
+  it('maps an unparsable value (an unknown enum label) to 400', () => {
+    const { status, body } = run(pgError('22P02'));
+    expect(status).toBe(400);
+    expect(body.error.message).toBe('A value in the request has the wrong format');
+  });
+
   it('maps a deadlock to 409 Busy', () => {
     const { status, body } = run(pgError('40P01'));
     expect(status).toBe(409);

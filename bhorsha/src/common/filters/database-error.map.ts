@@ -73,6 +73,15 @@ const CONSTRAINT_MESSAGES: Record<
 const INTEGRITY_CODES = new Set(['23505', '23503', '23514']);
 /** deadlock, serialization failure, lock not available */
 const BUSY_CODES = new Set(['40P01', '40001', '55P03']);
+/**
+ * A value from the request that the column can't hold, e.g. an id above
+ * 2147483647 (the integer limit) or an unknown enum label. That is bad input,
+ * so 400 instead of a 500.
+ */
+const BAD_INPUT_MESSAGES: Record<string, string> = {
+  '22003': 'A number in the request is out of range',
+  '22P02': 'A value in the request has the wrong format',
+};
 
 /**
  * Maps a PostgreSQL error to an HTTP answer, or returns null when it is not a
@@ -90,6 +99,14 @@ export function mapDatabaseError(
       status: HttpStatus.CONFLICT,
       code: 'BUSY',
       message: 'Busy, please retry',
+    };
+  }
+  const badInput = BAD_INPUT_MESSAGES[code];
+  if (badInput) {
+    return {
+      status: HttpStatus.BAD_REQUEST,
+      code: 'BAD_REQUEST',
+      message: badInput,
     };
   }
   if (!INTEGRITY_CODES.has(code)) {

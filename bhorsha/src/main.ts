@@ -1,28 +1,14 @@
-import { Logger, ValidationPipe } from '@nestjs/common';
+import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module.js';
-import { validationExceptionFactory } from './common/filters/validation-exception.factory.js';
-import { TimingInterceptor } from './common/interceptors/timing.interceptor.js';
-import { TransformInterceptor } from './common/interceptors/transform.interceptor.js';
+import { configureApp } from './app.setup.js';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const logger = new Logger('Bootstrap');
 
-  app.setGlobalPrefix('api/v1');
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      transform: true,
-      exceptionFactory: validationExceptionFactory,
-    }),
-  );
-  app.useGlobalInterceptors(
-    new TimingInterceptor(),
-    new TransformInterceptor(),
-  );
+  configureApp(app);
 
   // Configure Swagger Documentation at /api/docs
   const swaggerConfig = new DocumentBuilder()

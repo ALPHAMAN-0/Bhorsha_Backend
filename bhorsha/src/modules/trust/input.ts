@@ -27,8 +27,9 @@ export function limitOf(value: unknown, maximum = 100): number {
 /** Reads a Tk amount (up to 2 decimals) from the request and returns it as paisa for the bigint column. */
 export function tkAsPaisa(value: unknown, field = 'amountClaimedTk'): string | null {
   if (value === undefined || value === null) return null;
-  if (!(typeof value === 'string' || typeof value === 'number') || !/^\d+(\.\d{1,2})?$/.test(String(value)) || Number(value) > MAX_TK) {
-    throw new BadRequestException(`${field} must be a nonnegative Tk amount with at most 2 decimals`);
+  // Above 0, as ck_support_cases_amount_claimed requires.
+  if (!(typeof value === 'string' || typeof value === 'number') || !/^\d+(\.\d{1,2})?$/.test(String(value)) || Number(value) <= 0 || Number(value) > MAX_TK) {
+    throw new BadRequestException(`${field} must be a Tk amount above 0 with at most 2 decimals`);
   }
   return String(tkToPaisa(Number(value)));
 }

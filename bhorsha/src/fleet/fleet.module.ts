@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { PricingModule } from '../pricing/pricing.module.js';
 import { DriverRidesController } from './driver-rides.controller.js';
 import { DriverRidesService } from './driver-rides.service.js';
 import { DriversController } from './drivers.controller.js';
@@ -14,7 +15,8 @@ import { VehiclesController } from './vehicles.controller.js';
 import { VehiclesService } from './vehicles.service.js';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([DriverProfile, Vehicle])],
+  // PricingModule: invites quote the same shared fare as a rider's join request.
+  imports: [TypeOrmModule.forFeature([DriverProfile, Vehicle]), PricingModule],
   controllers: [
     VehiclesController,
     DriversController,

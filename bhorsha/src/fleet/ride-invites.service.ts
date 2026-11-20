@@ -6,9 +6,10 @@ import {
 } from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
 import { paisaToTk } from '../common/money.js';
+import { PricingService, type TripPrice } from '../pricing/pricing.service.js';
 import { DriversService } from './drivers.service.js';
 import { CreateInviteDto } from './dto/create-invite.dto.js';
-import { FareRuleRow, quoteSharedFare, SharedFare } from './shared-fare.js';
+import type { VehicleType } from './vehicle-type.js';
 
 const INVITE_LIFETIME_SECONDS = 60;
 const INVITE_RADIUS_KM = 3;
@@ -43,13 +44,6 @@ SELECT id
   FROM join_requests
  WHERE ride_id = $1 AND rider_id = $2 AND status = 'PENDING' AND expires_at > now()
  LIMIT 1`;
-
-const FIND_FARE_RULE_SQL = `
-SELECT id, base_paisa AS "basePaisa", per_km_paisa AS "perKmPaisa",
-       base_distance_m AS "baseDistanceM", ceiling_base_paisa AS "ceilingBasePaisa",
-       ceiling_per_km_paisa AS "ceilingPerKmPaisa"
-  FROM fare_rules
- WHERE vehicle_type = $1`;
 
 const INSERT_INVITE_SQL = `
 INSERT INTO join_requests (ride_id, rider_id, driver_id, initiated_by, seats,
@@ -114,6 +108,7 @@ export interface Invite {
 export class RideInvitesService {
   constructor(
     private readonly driversService: DriversService,
+    private readonly pricingService: PricingService,
     private readonly dataSource: DataSource,
   ) {}
 
@@ -133,7 +128,12 @@ export class RideInvitesService {
       );
       assertRiderFits(ride, rider);
       await this.assertNoOpenRequest(manager, rideId, rider.riderId);
-      const fare = await this.quoteFare(manager, ride.vehicleType, rider);
+      // The same shared fare a rider gets when they ask to join (doc/databaseSQL.md, fare_rules).
+      const fare = await this.pricingService.priceTrip(
+        ride.vehicleType as VehicleType,
+        rider.distanceM,
+        true,
+      );
       const { quotedFarePaisa, ceilingPaisa, ...row } = await this.insertInvite(
         manager,
         ride,
@@ -207,26 +207,12 @@ export class RideInvitesService {
     }
   }
 
-  private async quoteFare(
-    manager: EntityManager,
-    vehicleType: string,
-    rider: WaitingRider,
-  ): Promise<SharedFare> {
-    const rows: FareRuleRow[] = await manager.query(FIND_FARE_RULE_SQL, [
-      vehicleType,
-    ]);
-    if (rows.length === 0) {
-      throw new ConflictException(`No fare rule for ${vehicleType}`);
-    }
-    return quoteSharedFare(rows[0], vehicleType, rider.distanceM);
-  }
-
   private async insertInvite(
     manager: EntityManager,
     ride: LockedRide,
     rider: WaitingRider,
     userId: number,
-    fare: SharedFare,
+    fare: TripPrice,
   ): Promise<InviteRow> {
     const rows: InviteRow[] = await manager.query(INSERT_INVITE_SQL, [
       ride.id,

@@ -155,7 +155,7 @@ Before login existed, endpoints read the user from an `x-user-id` header. While 
 
 - Every route is under `/api/v1`.
 - Request bodies and query strings are checked against a DTO. Unknown fields are refused with 400.
-- Money is always integer **paisa** (Tk 1 = 100 paisa). Times are UTC.
+- Money is in **Tk** in every request and response (up to 2 decimals); the database stores whole paisa (Tk 1 = 100 paisa). Times are UTC.
 - `password_hash` never appears in a response.
 
 **Success** (the response envelope from `TransformInterceptor`):
@@ -200,7 +200,7 @@ A failed validation lists every field:
 | HTTP | `error.code` | When |
 |---|---|---|
 | 400 | `VALIDATION_FAILED` | The body or query doesn't match the DTO; `details` lists the fields |
-| 400 | `BAD_REQUEST` | Other bad input, such as a non-numeric id |
+| 400 | `BAD_REQUEST` | Other bad input, such as a non-numeric id, or a number the database can't hold (an id above 2147483647) |
 | 401 | `UNAUTHORIZED` | Not logged in (see the table above) |
 | 403 | `FORBIDDEN` | Wrong role, someone else's resource, or a deactivated account at login |
 | 404 | `NOT_FOUND` | No such record or route |
@@ -208,11 +208,11 @@ A failed validation lists every field:
 | 409 | `BUSY` | Deadlock or lock timeout; retry the request |
 | 500 | `INTERNAL_SERVER_ERROR` | A bug. The body never contains the stack trace or SQL; the server log has them, under the same `requestId` |
 
-The filter turns PostgreSQL errors 23505, 23503 and 23514 into these 409s by constraint name. The friendly messages come from [databaseSQL.md §10](doc/databaseSQL.md#10-error-map-for-the-global-exception-filter) and live in `src/common/filters/database-error.map.ts`.
+The filter turns PostgreSQL errors 23505, 23503 and 23514 into these 409s by constraint name. The friendly messages come from [databaseSQL.md §10](doc/databaseSQL.md#10-error-map-for-the-global-exception-filter) and live in `src/common/filters/database-error.map.ts`. Values the database can't parse (22003 out of range, 22P02 wrong format) become 400.
 
 ## Endpoints
 
-55 routes: the 54 of §26 plus `POST /sos`. Swagger has the request and response fields of each one. "Access" is what §26 specifies.
+55 routes: the 54 of §26 plus `POST /sos`. Swagger has the request and response fields of each one. "Access" is what §26 specifies. To test them all, see [doc/API-TESTING.md](doc/API-TESTING.md): one command (`pnpm test:endpoints`) or a step-by-step Swagger walkthrough.
 
 ### Admin: Siam (`src/modules/identity`, `src/modules/pricing`)
 
@@ -296,7 +296,8 @@ Support+ means Support Officer or Admin. The admin routes enforce their access w
 ```text
 bhorsha/
 ├── src/
-│   ├── main.ts                  /api/v1 prefix, ValidationPipe, interceptors, Swagger
+│   ├── main.ts                  starts the API and Swagger
+│   ├── app.setup.ts             /api/v1 prefix, ValidationPipe, interceptors (shared with the e2e tests)
 │   ├── app.module.ts            config, TypeORM (synchronize off), every module, the global filter
 │   ├── common/
 │   │   ├── decorators/          @Public(), @Roles(), @CurrentUser() (Siam); @CurrentUserId() (shared)
@@ -339,7 +340,7 @@ Two things in `app.module.ts` matter:
 4. **Responses.** Return plain data; the interceptor wraps it in the envelope. For lists, return `{ data, meta: { page, limit, total } }` and add `@ApiPagination()`. Never return `passwordHash` or a PIN; build the response from the fields you mean to send.
 5. **Transactions.** Use a `QueryRunner` or `dataSource.transaction()`, and take locks in the order of [databaseSQL.md §9](doc/databaseSQL.md#9-transactions-the-api-must-run).
 6. **Wire it.** Register the entity with `TypeOrmModule.forFeature()` in your module, and the module in `app.module.ts`. Entity columns must match the real table in databaseSQL.md, because `synchronize` is off.
-7. **Test.** Put a `*.spec.ts` next to the service, and run `pnpm test`, `pnpm lint` and `pnpm build` before you push.
+7. **Test.** Put a `*.spec.ts` next to the service, add an `it` for the endpoint to `test/all-endpoints.e2e-spec.ts`, and run `pnpm test`, `pnpm test:endpoints`, `pnpm lint` and `pnpm build` before you push.
 
 ## Scripts and tests
 
@@ -353,9 +354,10 @@ Two things in `app.module.ts` matter:
 | `pnpm test` | Unit tests (`src/**/*.spec.ts`, Vitest); no database needed |
 | `pnpm test:cov` | Unit tests with coverage |
 | `pnpm test:e2e` | End-to-end tests (`test/*.e2e-spec.ts`); need the database running |
+| `pnpm test:endpoints` | Only `test/all-endpoints.e2e-spec.ts`: every one of the 55 endpoints, end to end. Needs the database and Mailpit |
 | `pnpm test:concurrency` | Only the load test: 50 parallel requests for the last seat |
 
-The unit tests cover the guards (including the `x-user-id` fallback), the error filter and its PostgreSQL map, register and login, user management, driver verification and fare rules. The end-to-end tests send `x-user-id`, so run them with `ALLOW_X_USER_ID=true` in `.env`.
+The unit tests cover the guards (including the `x-user-id` fallback), the error filter and its PostgreSQL map, register and login, user management, driver verification and fare rules. `test/all-endpoints.e2e-spec.ts` logs in with real tokens and creates its own accounts; only the seed admin must exist. The concurrency test sends `x-user-id`, so run it with `ALLOW_X_USER_ID=true` in `.env`. The end-to-end tests add rows to the database on every run; [doc/API-TESTING.md](doc/API-TESTING.md) shows how to run them on a throwaway database.
 
 ## Troubleshooting
 
@@ -372,21 +374,21 @@ The unit tests cover the guards (including the `x-user-id` fallback), the error 
 
 ## Status and known issues
 
-Checked against the database image on 19 November 2026:
+Checked against a fresh `siam001/bhorsha-db:2.0.0` database on 20 November 2026: all 55 endpoints work. `pnpm test:endpoints` passes (56 tests), as do the unit tests and the 50-rider seat race.
 
 | Area | Status |
 |---|---|
-| Admin (11 endpoints) | Working. Covered by unit tests and a live run of every flow |
-| Driver (16) | Working, for example `GET /drivers/me`, `GET /vehicles/my`, `GET /rides/open` |
-| Support (14) | Working, for example `GET /cases`, `GET /strikes`, `GET /audit-logs` |
-| Rider (14) | Every endpoint tried (`/rides/quote`, `/rides/my`, `/rides`, `/join-requests/my`) answers 500: the entities in `src/trips` and `src/pricing` use columns that aren't in the database (`fare_bdt`, `base_fare`, `passenger_id`) and an `sos_events` table that doesn't exist. This is also why 15 of the 16 end-to-end tests fail |
+| Admin (11 endpoints) | Working |
+| Driver (16) | Working. Invites quote the same shared fare as a rider's own request (`fare_rules.share_discount_bps`) |
+| Rider (14) | Working (rewritten for DB v2 on 19 November); an SOS is emailed through Mailpit |
+| Support (14) | Working. Swagger now shows their request bodies and filters |
+
+`test/rider-lifecycle.e2e-spec.ts` was written for the v1 API (a ride without coordinates, responses without the envelope, user 1 as a rider), so its 14 tests fail even though the endpoints work. `test/all-endpoints.e2e-spec.ts` covers the same endpoints for the current API.
 
 Not built yet:
 
 - **Siam:** TypeORM migrations and `src/database/data-source.ts`.
 - **Anyka:** the request-ID and logging middleware, and the `AuditInterceptor` that logs every POST, PUT, PATCH and DELETE. Until the middleware exists, the error filter makes up a `requestId` for each error.
-
-Two classes map the `fare_rules` table: the admin one in `src/modules/pricing` (matches the database) and the quote's in `src/pricing` (doesn't). Both load without errors, but the quote's needs fixing, and the duplicate would confuse a future `migration:generate`.
 
 ## Team workflow
 

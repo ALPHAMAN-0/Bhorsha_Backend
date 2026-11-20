@@ -18,13 +18,13 @@ import { Roles } from '../common/decorators/roles.decorator.js';
 import { ApiPagination } from '../common/dto/page.js';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto.js';
 import type { AuthUser } from '../common/guards/auth-user.js';
-import { VehicleType } from '../fleet/vehicle-type.js';
 import { SafetyService } from '../safety/safety.service.js';
 import { Role } from '../users/entities/user.entity.js';
 import { CreateJoinRequestDto } from './dto/create-join-request.dto.js';
 import { CreateRatingDto } from './dto/create-rating.dto.js';
 import { CreateRideDto } from './dto/create-ride.dto.js';
 import { FindRidesQueryDto } from './dto/find-rides-query.dto.js';
+import { QuoteQueryDto } from './dto/quote-query.dto.js';
 import { SosLocationDto, TriggerSosDto } from './dto/trigger-sos.dto.js';
 import { TripsService } from './trips.service.js';
 
@@ -38,24 +38,8 @@ export class TripsController {
 
   @Get('rides/quote')
   @ApiOperation({ summary: 'Calculate upfront fare quote with BRTA legal ceiling rules' })
-  @ApiQuery({ name: 'vehicle_type', enum: VehicleType, required: false })
-  @ApiQuery({ name: 'distance_km', type: Number, required: false, example: 5.0 })
-  @ApiQuery({
-    name: 'is_shared',
-    type: Boolean,
-    required: false,
-    example: false,
-    description: 'Share the ride with other riders (CAR or CNG only; a BIKE is never shared)',
-  })
-  getQuote(
-    @Query('vehicle_type') vehicleType?: VehicleType,
-    @Query('distance_km') distanceKm?: string,
-    @Query('is_shared') isShared?: string,
-  ) {
-    const vType = vehicleType || VehicleType.CAR;
-    const dist = distanceKm ? parseFloat(distanceKm) : 5.0;
-    const shared = isShared === 'true' || isShared === '1';
-    return this.tripsService.getQuote(vType, dist, shared);
+  getQuote(@Query() query: QuoteQueryDto) {
+    return this.tripsService.getQuote(query.vehicle_type, query.distance_km, query.is_shared);
   }
 
   @Post('rides')

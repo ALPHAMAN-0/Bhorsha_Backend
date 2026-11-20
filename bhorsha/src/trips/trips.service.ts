@@ -266,15 +266,20 @@ export class TripsService {
       if (!ride) {
         throw new NotFoundException(`Ride ${id} not found`);
       }
-      if (ride.status === 'COMPLETED' || ride.status === 'CANCELLED') {
-        throw new ConflictException(`This ride is already ${ride.status.toLowerCase()}`);
-      }
       const passengers = await tx.rows<PassengerRow>(
         'SELECT * FROM ride_passengers WHERE ride_id = $1 ORDER BY id FOR UPDATE',
         [id],
       );
+      // Who may cancel is checked before the ride's state, so an outsider can't learn it.
+      const isDriver = ride.driver_id === user.id;
+      if (!isDriver && !passengers.some((p) => p.rider_id === user.id)) {
+        throw new ForbiddenException('You are not on this ride');
+      }
+      if (ride.status === 'COMPLETED' || ride.status === 'CANCELLED') {
+        throw new ConflictException(`This ride is already ${ride.status.toLowerCase()}`);
+      }
 
-      if (ride.driver_id === user.id) {
+      if (isDriver) {
         if (passengers.some((p) => p.status === 'PICKED_UP')) {
           throw new ConflictException('Drop off every passenger before cancelling the ride');
         }
@@ -301,10 +306,8 @@ export class TripsService {
       (p) => p.rider_id === riderId && LIVE_SEAT_STATUSES.includes(p.status),
     );
     if (!mine) {
-      if (passengers.some((p) => p.rider_id === riderId)) {
-        throw new ConflictException('Your seat on this ride is already closed');
-      }
-      throw new ForbiddenException('You are not on this ride');
+      // cancelRide already checked that the rider has a seat on this ride.
+      throw new ConflictException('Your seat on this ride is already closed');
     }
     if (mine.status === 'PICKED_UP') {
       throw new ConflictException('You are already on board: the driver ends your trip at drop-off');

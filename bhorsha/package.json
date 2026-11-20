@@ -20,6 +20,7 @@
     "test:cov": "vitest run --coverage",
     "test:debug": "vitest --inspect-brk --no-file-parallelism",
     "test:concurrency": "vitest run test/seat-concurrency-50.e2e-spec.ts --config ./vitest.config.e2e.ts",
+    "test:endpoints": "vitest run test/all-endpoints.e2e-spec.ts --config ./vitest.config.e2e.ts",
     "test:e2e": "vitest run --config ./vitest.config.e2e.ts"
   },
   "dependencies": {
