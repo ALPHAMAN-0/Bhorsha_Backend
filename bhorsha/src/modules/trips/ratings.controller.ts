@@ -12,7 +12,7 @@ export class RatingsController {
 
   @Post()
   @ApiOperation({ summary: 'Rate the driver or a co-rider (1-5 stars) after the trip' })
-  @ApiHeader({ name: 'x-user-id', description: 'Rater User ID', required: true, example: '1' })
+  @ApiHeader({ name: 'x-user-id', description: 'Rater User ID', required: false, example: '3' })
   createRating(@CurrentUser() user: AuthUser, @Body() dto: CreateRatingDto) {
     return this.ratingsService.rateRide(user, dto);
   }

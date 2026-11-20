@@ -14,7 +14,7 @@ import {
   type Principal,
   officer,
 } from '../../common/guards/support-auth.js';
-import { nonempty, oneOf } from '../../common/input.js';
+import { jsonBody, nonempty, oneOf } from '../../common/input.js';
 import { lockStrike } from './locks.js';
 
 @Injectable()
@@ -28,8 +28,9 @@ export class AppealsService {
     u: Principal,
     ctx: AuditContext,
     strikeId: number,
-    body: Record<string, unknown>,
+    rawBody: unknown,
   ) {
+    const body = jsonBody(rawBody, ['statement']);
     const statement = nonempty(body.statement, 'statement');
 
     return this.db.transaction(async (m) => {
@@ -70,10 +71,11 @@ export class AppealsService {
     u: Principal,
     ctx: AuditContext,
     id: number,
-    body: Record<string, unknown>,
+    rawBody: unknown,
   ) {
     officer(u);
 
+    const body = jsonBody(rawBody, ['status', 'decisionReason']);
     const status = oneOf(
       body.status,
       ['ACCEPTED', 'REJECTED'] as const,

@@ -24,7 +24,10 @@ export class QuoteQueryDto {
     description: 'Share the ride with other riders (CAR or CNG only; a BIKE is never shared)',
   })
   @IsOptional()
-  @Transform(({ value }) => value === true || value === 'true' || value === '1')
-  @IsBoolean()
+  // true/1 and false/0 become booleans; anything else stays as sent, so @IsBoolean refuses it (400).
+  @Transform(({ value }) =>
+    value === 'true' || value === '1' ? true : value === 'false' || value === '0' ? false : value,
+  )
+  @IsBoolean({ message: 'is_shared must be true or false' })
   is_shared: boolean = false;
 }

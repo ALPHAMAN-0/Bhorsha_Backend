@@ -10,7 +10,8 @@ export class CreateVehicleDto {
   @IsEnum(VehicleType, { message: 'type must be BIKE, CAR or CNG' })
   type: VehicleType;
 
-  @ApiProperty({ example: 'DHAKA METRO-GA 11-2345' })
+  // Not a seed vehicle's number (DHAKA METRO-GA 11-2345 is Karim's car), so the example works once.
+  @ApiProperty({ example: 'DHAKA METRO-GA 15-6789' })
   @Matches(REG_NO_PATTERN, { message: REG_NO_MESSAGE })
   regNo: string;
 }

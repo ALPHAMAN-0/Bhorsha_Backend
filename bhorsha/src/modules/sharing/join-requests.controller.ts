@@ -8,6 +8,7 @@ import {
   Query,
 } from '@nestjs/common';
 import {
+  ApiBody,
   ApiHeader,
   ApiOperation,
   ApiQuery,
@@ -15,7 +16,7 @@ import {
 } from '@nestjs/swagger';
 import { CurrentUser } from '../../common/decorators/current-user.decorator.js';
 import type { AuthUser } from '../../common/guards/auth-user.js';
-import { CreateJoinRequestDto } from './dto/create-join-request.dto.js';
+import { CreateJoinRequestDto, JOIN_REQUEST_EXAMPLES } from './dto/create-join-request.dto.js';
 import { JoinRequestsService } from './join-requests.service.js';
 
 /** The rider's side of sharing: find a shared ride or route offer, ask to join, answer. */
@@ -49,14 +50,15 @@ export class JoinRequestsController {
     description:
       'Send exactly one of ride_id or route_offer_id. The shared fare is quoted in Tk and locked if the driver accepts.',
   })
-  @ApiHeader({ name: 'x-user-id', description: 'Passenger User ID', required: true, example: '2' })
+  @ApiBody({ type: CreateJoinRequestDto, examples: JOIN_REQUEST_EXAMPLES })
+  @ApiHeader({ name: 'x-user-id', description: 'Passenger User ID', required: false, example: '4' })
   createJoinRequest(@CurrentUser() user: AuthUser, @Body() dto: CreateJoinRequestDto) {
     return this.joinRequestsService.createJoinRequest(user, dto);
   }
 
   @Get('join-requests/my')
   @ApiOperation({ summary: 'Join requests and invites I sent or received' })
-  @ApiHeader({ name: 'x-user-id', description: 'Passenger User ID', required: true, example: '2' })
+  @ApiHeader({ name: 'x-user-id', description: 'Passenger User ID', required: false, example: '4' })
   findMyJoinRequests(@CurrentUser() user: AuthUser) {
     return this.joinRequestsService.findMyJoinRequests(user);
   }
@@ -65,14 +67,14 @@ export class JoinRequestsController {
   @ApiOperation({
     summary: "Accept a join request (driver) or an invite (rider): the seat transaction",
   })
-  @ApiHeader({ name: 'x-user-id', description: 'Driver (for a request) or rider (for an invite)', required: true, example: '1' })
+  @ApiHeader({ name: 'x-user-id', description: 'Driver (for a request) or rider (for an invite)', required: false, example: '5' })
   acceptJoinRequest(@CurrentUser() user: AuthUser, @Param('id', ParseIntPipe) id: number) {
     return this.joinRequestsService.respondJoinRequest(id, user, true);
   }
 
   @Post('join-requests/:id/decline')
   @ApiOperation({ summary: 'Decline a join request (driver) or an invite (rider)' })
-  @ApiHeader({ name: 'x-user-id', description: 'Driver (for a request) or rider (for an invite)', required: true, example: '1' })
+  @ApiHeader({ name: 'x-user-id', description: 'Driver (for a request) or rider (for an invite)', required: false, example: '5' })
   declineJoinRequest(@CurrentUser() user: AuthUser, @Param('id', ParseIntPipe) id: number) {
     return this.joinRequestsService.respondJoinRequest(id, user, false);
   }

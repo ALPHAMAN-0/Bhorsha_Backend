@@ -42,7 +42,7 @@ export class RidesController {
       'Creates a REQUESTED ride and your seat on it, with the fare locked in Tk and a 4-digit pickup PIN ' +
       'to tell the driver. Booking again replaces your own ride that no driver has accepted yet.',
   })
-  @ApiHeader({ name: 'x-user-id', description: 'Rider User ID', required: true, example: '1' })
+  @ApiHeader({ name: 'x-user-id', description: 'Rider User ID', required: false, example: '3' })
   createRide(@CurrentUser() user: AuthUser, @Body() dto: CreateRideDto) {
     return this.ridesService.createRide(user, dto);
   }
@@ -50,7 +50,7 @@ export class RidesController {
   @Get('rides/my')
   @ApiPagination()
   @ApiOperation({ summary: 'List my rides, newest first (as rider or driver)' })
-  @ApiHeader({ name: 'x-user-id', description: 'User ID', required: true, example: '1' })
+  @ApiHeader({ name: 'x-user-id', description: 'User ID', required: false, example: '3' })
   findMyRides(@CurrentUser() user: AuthUser, @Query() query: PaginationQueryDto) {
     return this.ridesService.findMyRides(user, query.page, query.limit);
   }
@@ -73,7 +73,7 @@ export class RidesController {
   @ApiOperation({
     summary: 'Cancel: a rider cancels their seat before pickup; the driver cancels the whole ride',
   })
-  @ApiHeader({ name: 'x-user-id', description: 'Rider or Driver ID', required: true, example: '1' })
+  @ApiHeader({ name: 'x-user-id', description: 'Rider or Driver ID', required: false, example: '3' })
   cancelRide(@CurrentUser() user: AuthUser, @Param('id', ParseIntPipe) id: number) {
     return this.ridesService.cancelRide(user, id);
   }

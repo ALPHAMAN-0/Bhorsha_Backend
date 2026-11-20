@@ -33,6 +33,22 @@ export function tkAsPaisa(value: unknown, field = 'amountClaimedTk'): string | n
   }
   return String(tkToPaisa(Number(value)));
 }
+/**
+ * The JSON body of an endpoint that takes a plain object instead of a DTO (the support endpoints).
+ * The global ValidationPipe can't check those, so this does what it does for DTOs: a missing body
+ * counts as {} (Express 5 leaves req.body undefined), and a field the endpoint doesn't take is a 400.
+ */
+export function jsonBody(body: unknown, allowed: readonly string[]): Record<string, unknown> {
+  const value = body ?? {};
+  if (typeof value !== 'object' || Array.isArray(value)) {
+    throw new BadRequestException('The request body must be a JSON object');
+  }
+  const extra = Object.keys(value).filter((key) => !allowed.includes(key));
+  if (extra.length > 0) {
+    throw new BadRequestException(`Unknown field ${extra.join(', ')}: send only ${allowed.join(', ')}`);
+  }
+  return value as Record<string, unknown>;
+}
 export function futureDate(value: unknown, field = 'expiresAt'): Date {
   const date = new Date(String(value));
   if (!value || isNaN(date.getTime()) || date.getTime() <= Date.now()) throw new BadRequestException(`${field} must be a future ISO date`);

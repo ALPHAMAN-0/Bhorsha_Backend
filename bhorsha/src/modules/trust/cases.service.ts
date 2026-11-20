@@ -22,6 +22,7 @@ import {
   oneOf,
   tkAsPaisa,
   limitOf,
+  jsonBody,
 } from '../../common/input.js';
 import { paisaToTk } from '../../common/money.js';
 import {
@@ -57,8 +58,9 @@ export class CasesService {
   async create(
     u: Principal,
     ctx: AuditContext,
-    body: Record<string, unknown>,
+    rawBody: unknown,
   ) {
+    const body = jsonBody(rawBody, ['type', 'description', 'subjectId', 'rideId', 'amountClaimedTk']);
     const type = oneOf(body.type, types, 'type');
     const description = nonempty(body.description, 'description');
     const subjectId = optionalId(body.subjectId, 'subjectId');
@@ -140,18 +142,15 @@ export class CasesService {
     u: Principal,
     ctx: AuditContext,
     id: number,
-    body: Record<string, unknown>,
+    rawBody: unknown,
   ) {
     officer(u);
 
-    const allowed = ['assignedTo', 'status', 'resolution'];
+    const body = jsonBody(rawBody, ['assignedTo', 'status', 'resolution']);
 
-    if (
-      Object.keys(body).some((k) => !allowed.includes(k)) ||
-      !Object.keys(body).length
-    ) {
+    if (!Object.keys(body).length) {
       throw new BadRequestException(
-        'Only assignedTo, status and resolution are editable',
+        'Send at least one of assignedTo, status and resolution',
       );
     }
 

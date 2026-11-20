@@ -407,6 +407,7 @@ describe('All 55 endpoints (e2e)', { timeout: 30_000 }, () => {
       await expectCall(400, 'get', '/rides/quote?vehicle_type=BIKE&is_shared=true', riderA);
       await expectCall(400, 'get', '/rides/quote?vehicle_type=TRUCK', riderA);
       await expectCall(400, 'get', '/rides/quote?distance_km=abc', riderA);
+      await expectCall(400, 'get', '/rides/quote?vehicle_type=CAR&is_shared=maybe', riderA); // not read as false
       await expectCall(401, 'get', '/rides/quote');
     });
 
@@ -727,6 +728,8 @@ describe('All 55 endpoints (e2e)', { timeout: 30_000 }, () => {
       await expectCall(400, 'post', '/cases', riderA, { type: 'CONDUCT', description: 'x', amountClaimedTk: 10 });
       await expectCall(400, 'post', '/cases', riderA, { type: 'CONDUCT', description: 'x', subjectId: riderA.id });
       await expectCall(400, 'post', '/cases', riderA, { type: 'NOPE', description: 'x' });
+      await expectCall(400, 'post', '/cases', riderA, { type: 'OTHER', description: 'x', notes: 'not a field' });
+      await expectCall(400, 'post', '/cases', riderA); // no body at all: 400, not 500
       await expectCall(401, 'post', '/cases', null, { type: 'OTHER', description: 'x' });
     });
 
@@ -752,6 +755,7 @@ describe('All 55 endpoints (e2e)', { timeout: 30_000 }, () => {
       expect(review.data).toMatchObject({ status: 'UNDER_REVIEW', assigned_to: officerA.id });
       await expectCall(403, 'patch', `/cases/${caseId}`, riderA, { status: 'UPHELD' });
       await expectCall(400, 'patch', `/cases/${caseId}`, officerA, { notes: 'not a field' });
+      await expectCall(400, 'patch', `/cases/${caseId}`, officerA); // no body
       const upheld = await expectCall(200, 'patch', `/cases/${caseId}`, officerA, {
         status: 'UPHELD',
         resolution: 'The driver demanded more than the locked fare',
@@ -773,6 +777,8 @@ describe('All 55 endpoints (e2e)', { timeout: 30_000 }, () => {
     it("POST /strikes: from an UPHELD case, against the case's subject", async () => {
       await expectCall(403, 'post', '/strikes', riderA, { caseId, userId: driver.id, reason: 'x' });
       await expectCall(409, 'post', '/strikes', officerA, { caseId, userId: riderB.id, reason: 'Not the subject' });
+      await expectCall(400, 'post', '/strikes', officerA, { caseId, userId: driver.id, reason: 'x', notes: 'not a field' });
+      await expectCall(400, 'post', '/strikes', officerA); // no body
       const body = await expectCall(201, 'post', '/strikes', officerA, { caseId, userId: driver.id, reason: 'Overcharged a rider' });
       expect(body.data).toMatchObject({ status: 'ACTIVE', user_id: driver.id, issued_by: officerA.id, case_id: caseId });
       strikeId = body.data.id;
@@ -804,11 +810,14 @@ describe('All 55 endpoints (e2e)', { timeout: 30_000 }, () => {
       expect(new Date(body.data.expires_at).toISOString()).toBe(expiresAt);
       await expectCall(400, 'patch', `/strikes/${strikeId}`, officerA, { status: 'REVOKED' });
       await expectCall(400, 'patch', `/strikes/${strikeId}`, officerA, { expiresAt: '2020-01-01' });
+      await expectCall(400, 'patch', `/strikes/${strikeId}`, officerA); // no body
       await expectCall(403, 'patch', `/strikes/${strikeId}`, driver, { reason: 'Mine now' });
     });
 
     it('POST /strikes/:id/appeals: the struck user appeals once', async () => {
       await expectCall(403, 'post', `/strikes/${strikeId}/appeals`, riderA, { statement: 'Not my strike' });
+      await expectCall(400, 'post', `/strikes/${strikeId}/appeals`, driver, { statement: 'x', notes: 'not a field' });
+      await expectCall(400, 'post', `/strikes/${strikeId}/appeals`, driver); // no body
       const body = await expectCall(201, 'post', `/strikes/${strikeId}/appeals`, driver, {
         statement: 'The rider agreed to pay the bridge toll on top of the fare',
       });
@@ -822,6 +831,8 @@ describe('All 55 endpoints (e2e)', { timeout: 30_000 }, () => {
       await expectCall(403, 'patch', `/appeals/${appealId}`, officerA, { status: 'ACCEPTED', decisionReason: 'Own strike' });
       await expectCall(403, 'patch', `/appeals/${appealId}`, driver, { status: 'ACCEPTED', decisionReason: 'Mine' });
       await expectCall(400, 'patch', `/appeals/${appealId}`, officerB, { status: 'MAYBE', decisionReason: 'x' });
+      await expectCall(400, 'patch', `/appeals/${appealId}`, officerB, { status: 'ACCEPTED', decisionReason: 'x', notes: 'not a field' });
+      await expectCall(400, 'patch', `/appeals/${appealId}`, officerB); // no body
       const body = await expectCall(200, 'patch', `/appeals/${appealId}`, officerB, {
         status: 'ACCEPTED',
         decisionReason: 'The toll receipt was provided',

@@ -21,6 +21,7 @@ import {
   oneOf,
   limitOf,
   futureDate,
+  jsonBody,
 } from '../../common/input.js';
 import { StrikeStatus } from './entities/strike.entity.js';
 import { lockCase, lockStrike } from './locks.js';
@@ -35,10 +36,11 @@ export class StrikesService {
   async create(
     u: Principal,
     ctx: AuditContext,
-    body: Record<string, unknown>,
+    rawBody: unknown,
   ) {
     officer(u);
 
+    const body = jsonBody(rawBody, ['caseId', 'userId', 'reason']);
     const caseId = positiveId(body.caseId, 'caseId');
     const userId = positiveId(body.userId, 'userId');
     const reason = nonempty(body.reason, 'reason');
@@ -131,18 +133,15 @@ export class StrikesService {
     u: Principal,
     ctx: AuditContext,
     id: number,
-    body: Record<string, unknown>,
+    rawBody: unknown,
   ) {
     officer(u);
 
-    if (
-      !Object.keys(body).length ||
-      Object.keys(body).some(
-        (k) => !['reason', 'expiresAt'].includes(k),
-      )
-    ) {
+    const body = jsonBody(rawBody, ['reason', 'expiresAt']);
+
+    if (!Object.keys(body).length) {
       throw new BadRequestException(
-        'Only reason and expiresAt are editable',
+        'Send at least one of reason and expiresAt',
       );
     }
 

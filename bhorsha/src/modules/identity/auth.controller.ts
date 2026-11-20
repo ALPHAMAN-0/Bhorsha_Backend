@@ -1,9 +1,9 @@
 import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBody, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Public } from '../../common/decorators/public.decorator.js';
 import { AuthService } from './auth.service.js';
 import { LoginDto } from './dto/login.dto.js';
-import { RegisterDto } from './dto/register.dto.js';
+import { REGISTER_EXAMPLES, RegisterDto } from './dto/register.dto.js';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -17,6 +17,7 @@ export class AuthController {
     description:
       'A driver also needs licenceNo; the user and the driver profile are created in one transaction. A taken phone, email or licence number returns 409.',
   })
+  @ApiBody({ type: RegisterDto, examples: REGISTER_EXAMPLES })
   register(@Body() dto: RegisterDto) {
     return this.auth.register(dto);
   }

@@ -1,4 +1,4 @@
-import { ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiPropertyOptional, type ExamplesObject } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import {
   IsBoolean,
@@ -13,6 +13,20 @@ import {
 } from 'class-validator';
 import { Role } from '../entities/user.entity.js';
 import { trim, trimLower } from './user-fields.js';
+
+/**
+ * Swagger examples for PATCH /users/:id, one change each. Without them Swagger UI fills in every
+ * field (role RIDER, isActive, suspendedUntil): the owner gets 403, and an admin who presses
+ * Execute renames, suspends and re-roles the user at once.
+ */
+export const UPDATE_USER_EXAMPLES: ExamplesObject = {
+  rename: { summary: 'Change your name (owner)', value: { fullName: 'Rahim Uddin' } },
+  email: { summary: 'Change your email; null removes it (owner)', value: { email: 'rahim.uddin@example.com' } },
+  suspend: { summary: 'Suspend until a date (Admin)', value: { suspendedUntil: '2027-01-01T00:00:00Z' } },
+  unsuspend: { summary: 'Lift a suspension (Admin)', value: { suspendedUntil: null } },
+  deactivate: { summary: 'Deactivate the account (Admin)', value: { isActive: false } },
+  role: { summary: 'Change the role, never to or from DRIVER (Admin)', value: { role: Role.SUPPORT } },
+};
 
 /**
  * PATCH /users/:id. The owner may change fullName and email; role, isActive

@@ -26,5 +26,7 @@ export const LIMIT_QUERY = {
   required: false,
   type: Number,
   description: '1 to 100 (default 20)',
+  minimum: 1,
+  maximum: 100,
   example: 20,
 };

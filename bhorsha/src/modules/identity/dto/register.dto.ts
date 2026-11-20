@@ -1,4 +1,4 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional, type ExamplesObject } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import {
   IsEmail,
@@ -23,6 +23,35 @@ import {
 } from './user-fields.js';
 
 export const SELF_SIGNUP_ROLES = [Role.RIDER, Role.DRIVER] as const;
+
+/**
+ * Swagger examples for POST /auth/register. Without them Swagger UI fills in every field,
+ * licenceNo included, and a RIDER with a licence number is refused. The rider's phone and
+ * password match the POST /auth/login example.
+ */
+export const REGISTER_EXAMPLES: ExamplesObject = {
+  rider: {
+    summary: 'A rider',
+    value: {
+      fullName: 'Rahim Uddin',
+      phone: '+8801712345678',
+      email: 'rahim@example.com',
+      password: 'Str0ngPass!',
+      role: Role.RIDER,
+    },
+  },
+  driver: {
+    summary: 'A driver (licenceNo is required)',
+    value: {
+      fullName: 'Sohel Rana',
+      phone: '+8801912345678',
+      email: 'sohel@example.com',
+      password: 'Str0ngPass!',
+      role: Role.DRIVER,
+      licenceNo: 'DK-0123456789',
+    },
+  },
+};
 
 export class RegisterDto {
   @ApiProperty({ example: 'Rahim Uddin', maxLength: 100 })

@@ -11,15 +11,15 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBody, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../../common/decorators/current-user.decorator.js';
 import { Roles } from '../../common/decorators/roles.decorator.js';
 import { ApiPagination } from '../../common/dto/page.js';
 import type { AuthUser } from '../../common/guards/auth-user.js';
 import { Role } from './entities/user.entity.js';
-import { CreateStaffDto } from './dto/create-staff.dto.js';
+import { CREATE_STAFF_EXAMPLES, CreateStaffDto } from './dto/create-staff.dto.js';
 import { ListUsersQueryDto } from './dto/list-users-query.dto.js';
-import { UpdateUserDto } from './dto/update-user.dto.js';
+import { UPDATE_USER_EXAMPLES, UpdateUserDto } from './dto/update-user.dto.js';
 import { UsersService } from './users.service.js';
 
 @ApiTags('Users')
@@ -45,6 +45,7 @@ export class UsersController {
   @Roles(Role.ADMIN)
   @Post()
   @ApiOperation({ summary: 'Create an Admin or Support Officer account (Admin)' })
+  @ApiBody({ type: CreateStaffDto, examples: CREATE_STAFF_EXAMPLES })
   create(@Body() dto: CreateStaffDto) {
     return this.users.createStaff(dto);
   }
@@ -55,6 +56,7 @@ export class UsersController {
     description:
       'The owner may change fullName and email. role, isActive and suspendedUntil are Admin only.',
   })
+  @ApiBody({ type: UpdateUserDto, examples: UPDATE_USER_EXAMPLES })
   update(
     @CurrentUser() actor: AuthUser,
     @Param('id', ParseIntPipe) id: number,
