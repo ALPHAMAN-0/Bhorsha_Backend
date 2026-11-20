@@ -8,8 +8,8 @@ import type { AuthUser } from '../../common/guards/auth-user.js';
 import {
   DriverAvailability,
   DriverProfile,
-} from '../../fleet/entities/driver-profile.entity.js';
-import { Role, User } from '../../users/entities/user.entity.js';
+} from '../fleet/entities/driver-profile.entity.js';
+import { Role, User } from './entities/user.entity.js';
 import { UserStatusFilter } from './dto/list-users-query.dto.js';
 import { UsersService } from './users.service.js';
 

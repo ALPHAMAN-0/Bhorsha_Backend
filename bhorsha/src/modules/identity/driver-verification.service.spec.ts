@@ -4,8 +4,8 @@ import {
   DriverAvailability,
   type DriverProfile,
   DriverVerification,
-} from '../../fleet/entities/driver-profile.entity.js';
-import { Role } from '../../users/entities/user.entity.js';
+} from '../fleet/entities/driver-profile.entity.js';
+import { Role } from './entities/user.entity.js';
 import { DriverVerificationService } from './driver-verification.service.js';
 
 const NOW = new Date('2026-11-19T10:00:00Z');

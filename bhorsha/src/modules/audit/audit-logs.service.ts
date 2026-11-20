@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
-import { limitOf, positiveId } from '../trust/input.js';
+import { limitOf, positiveId } from '../../common/input.js';
 export interface AuditContext { userId: number; requestId?: string; ip?: string; }
 @Injectable()
 export class AuditLogsService {

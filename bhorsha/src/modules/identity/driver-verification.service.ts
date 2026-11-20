@@ -11,7 +11,7 @@ import {
   DriverAvailability,
   DriverProfile,
   DriverVerification,
-} from '../../fleet/entities/driver-profile.entity.js';
+} from '../fleet/entities/driver-profile.entity.js';
 import type { ListDriversQueryDto } from './dto/list-drivers-query.dto.js';
 import type { VerifyDriverDto } from './dto/verify-driver.dto.js';
 import { type PublicUser, toPublicUser } from './user-response.js';

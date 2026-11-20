@@ -4,8 +4,8 @@ import request from 'supertest';
 import { App } from 'supertest/types.js';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AppModule } from '../src/app.module.js';
-import { VehicleType } from '../src/fleet/vehicle-type.js';
-import { RideStatus } from '../src/trips/entities/ride.entity.js';
+import { VehicleType } from '../src/modules/fleet/vehicle-type.js';
+import { RideStatus } from '../src/modules/trips/entities/ride.entity.js';
 
 describe('Rider Domain Complete Lifecycle Suite (13 Endpoints End-to-End)', () => {
   let app: INestApplication<App>;

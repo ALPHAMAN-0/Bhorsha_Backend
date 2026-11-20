@@ -1,6 +1,6 @@
 import { ApiProperty, PickType } from '@nestjs/swagger';
 import { IsIn } from 'class-validator';
-import { Role } from '../../../users/entities/user.entity.js';
+import { Role } from '../entities/user.entity.js';
 import { RegisterDto } from './register.dto.js';
 
 export const STAFF_ROLES = [Role.ADMIN, Role.SUPPORT] as const;

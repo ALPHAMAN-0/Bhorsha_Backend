@@ -1,5 +1,5 @@
-import type { DriverProfile } from '../../fleet/entities/driver-profile.entity.js';
-import type { Role, User } from '../../users/entities/user.entity.js';
+import type { DriverProfile } from '../fleet/entities/driver-profile.entity.js';
+import type { Role, User } from './entities/user.entity.js';
 
 /** What the API returns for a user. password_hash is never part of it. */
 export interface PublicUser {

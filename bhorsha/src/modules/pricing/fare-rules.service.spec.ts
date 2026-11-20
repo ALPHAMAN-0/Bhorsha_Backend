@@ -4,8 +4,8 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import type { AuthUser } from '../../common/guards/auth-user.js';
-import { VehicleType } from '../../fleet/vehicle-type.js';
-import { Role } from '../../users/entities/user.entity.js';
+import { VehicleType } from '../fleet/vehicle-type.js';
+import { Role } from '../identity/entities/user.entity.js';
 import type { FareRule } from './entities/fare-rule.entity.js';
 import { FareRulesService } from './fare-rules.service.js';
 

@@ -1,5 +1,5 @@
 import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
-import { VehicleType } from '../../../fleet/vehicle-type.js';
+import { VehicleType } from '../../fleet/vehicle-type.js';
 
 @Entity('fare_rules')
 export class FareRule {

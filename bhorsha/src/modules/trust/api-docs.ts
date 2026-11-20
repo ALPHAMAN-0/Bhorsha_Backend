@@ -122,14 +122,6 @@ export const DECIDE_APPEAL_BODY: SchemaObject = {
   },
 };
 
-export const LIMIT_QUERY = {
-  name: 'limit',
-  required: false,
-  type: Number,
-  description: '1 to 100 (default 20)',
-  example: 20,
-};
-
 export const CASE_STATUS_QUERY = {
   name: 'status',
   required: false,

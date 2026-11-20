@@ -5,7 +5,7 @@ import { Roles } from '../../common/decorators/roles.decorator.js';
 import { PaginationQueryDto } from '../../common/dto/pagination-query.dto.js';
 import { ApiPagination } from '../../common/dto/page.js';
 import type { AuthUser } from '../../common/guards/auth-user.js';
-import { Role } from '../../users/entities/user.entity.js';
+import { Role } from '../identity/entities/user.entity.js';
 import { UpdateFareRuleDto } from './dto/update-fare-rule.dto.js';
 import { FareRulesService } from './fare-rules.service.js';
 

@@ -1,7 +1,7 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsEnum, IsOptional } from 'class-validator';
 import { PaginationQueryDto } from '../../../common/dto/pagination-query.dto.js';
-import { DriverVerification } from '../../../fleet/entities/driver-profile.entity.js';
+import { DriverVerification } from '../../fleet/entities/driver-profile.entity.js';
 
 export class ListDriversQueryDto extends PaginationQueryDto {
   @ApiPropertyOptional({

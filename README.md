@@ -386,19 +386,18 @@ Bhorsha_Backend/
     ├── src/
     │   ├── main.ts              /api/v1 prefix, ValidationPipe, interceptors, Swagger
     │   ├── app.module.ts        config, TypeORM (synchronize off), every module, the global filter
-    │   ├── common/              decorators, guards, exception filter, interceptors, pagination
+    │   ├── common/              decorators, guards, exception filter, interceptors, pagination, transactions
     │   ├── config/              env validation
-    │   ├── users/               User entity
-    │   ├── fleet/               driver profiles, vehicles, the driver's ride steps, route offers, invites
-    │   ├── trips/               rides, passengers, join requests, ratings
-    │   ├── pricing/             the fare quote
-    │   ├── safety/              SOS
-    │   ├── notify/              SOS email (caught by Mailpit)
-    │   └── modules/
-    │       ├── identity/        auth, users, driver verification
-    │       ├── pricing/         fare rules
-    │       ├── trust/           cases, strikes, appeals
-    │       └── audit/           audit logs
+    │   └── modules/             one module per group of tables
+    │       ├── identity/        users: auth, users, driver verification
+    │       ├── fleet/           driver_profiles, vehicles: driver profile, status, location, vehicles
+    │       ├── pricing/         fare_rules: fare rules and the fare quote
+    │       ├── trips/           rides, ride_passengers, ratings: booking, the driver's ride steps, ratings
+    │       ├── sharing/         route_offers, join_requests: route offers, invites, join requests
+    │       ├── safety/          SOS (an email; there is no sos_events table yet)
+    │       ├── trust/           support_cases, strikes, appeals
+    │       ├── audit/           audit_logs
+    │       └── notify/          email over SMTP (caught by Mailpit)
     ├── test/                    end-to-end tests (Vitest + Supertest)
     ├── doc/                     databaseSQL.md (database reference), draw.io diagrams, setup photos
     ├── docker-compose.yml       PostgreSQL 16 (siam001/bhorsha-db:2.0.0) and Mailpit
@@ -406,7 +405,7 @@ Bhorsha_Backend/
     └── package.json             scripts (pnpm)
 ```
 
-The admin and support code uses the document's layout (`src/modules/<module>`). The driver and rider code is still in top-level folders under `src/`. `src/modules/fleet`, `trips`, `sharing` and `notify` hold only empty placeholder classes that nothing imports.
+All the code uses the document's layout (`src/modules/<module>`), with the modules from [§8](#8-system-architecture) that the course release needs, and follows the boundary rules there. A module writes only its own tables. Other modules call it through the services it exports. The seat transaction is the one place where two modules, `sharing` and `trips`, write in the same transaction.
 
 Only the course-release modules exist. Location, dispatch, ledger and geo are out of scope: driver location is two columns on `driver_profiles`, drivers pull open requests instead of receiving dispatch offers, and SOS is an email.
 
@@ -416,15 +415,16 @@ Each module keeps its own entities, DTOs, controllers and services and registers
 
 | Folder in `bhorsha/src/` | Tables | Built by |
 |---|---|---|
-| `users/`, `modules/identity/` | users, driver_profiles | Roshni: the users table (project setup). Siam: register, login, users CRUD, driver list and verification |
-| `fleet/` | driver_profiles, vehicles, rides, route_offers | Roshni: own profile, status, location, vehicles CRUD, open requests, accept, arrive, pickup, drop-off, route offers, invites |
-| `modules/pricing/` | fare_rules | Siam: fare rules |
-| `pricing/` | fare_rules | Numman: the fare quote |
-| `trips/` | rides, ride_passengers, join_requests, ratings | Numman: booking, own and all rides, cancel, nearby offers, join requests, accept and decline (seat transaction), ratings |
-| `safety/`, `notify/` | — | Numman: SOS and the mailer |
+| `modules/identity/` | users, driver_profiles | Roshni: the users table (project setup). Siam: register, login, users CRUD, driver list and verification |
+| `modules/fleet/` | driver_profiles, vehicles | Roshni: own profile, status, location, vehicles CRUD |
+| `modules/pricing/` | fare_rules | Siam: fare rules. Numman: the fare quote |
+| `modules/trips/` | rides, ride_passengers, ratings | Numman: booking, own and all rides, cancel, ratings. Roshni: open requests, accept, arrive, pickup, drop-off |
+| `modules/sharing/` | route_offers, join_requests | Numman: nearby offers, join requests, accept and decline (seat transaction). Roshni: route offers, invites |
+| `modules/safety/` | — | Numman: SOS |
+| `modules/notify/` | — | Numman: the mailer |
 | `modules/trust/` | support_cases, strikes, appeals | Anyka: cases, strikes, appeals |
 | `modules/audit/` | audit_logs | Anyka: the audit-log reads |
-| `common/decorators/`, `common/guards/`, `common/filters/` | — | Siam |
+| `common/decorators/`, `common/guards/`, `common/filters/` | — | Siam (`guards/support-auth.ts` and `common/input.ts`: Anyka) |
 | `common/interceptors/`, `common/dto/` | — | Roshni: timing, the response envelope, pagination. Anyka: the audit interceptor (not built yet) |
 | `common/middleware/` | — | Anyka: request logging and the request ID (not built yet) |
 | `config/` | — | Numman: env validation |

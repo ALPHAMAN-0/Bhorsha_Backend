@@ -12,8 +12,8 @@ import type { AuthUser } from '../../common/guards/auth-user.js';
 import {
   DriverAvailability,
   DriverProfile,
-} from '../../fleet/entities/driver-profile.entity.js';
-import { Role, User } from '../../users/entities/user.entity.js';
+} from '../fleet/entities/driver-profile.entity.js';
+import { Role, User } from './entities/user.entity.js';
 import type { CreateStaffDto } from './dto/create-staff.dto.js';
 import {
   type ListUsersQueryDto,

@@ -13,8 +13,8 @@ import {
 import {
   type Principal,
   officer,
-} from './support-auth.js';
-import { nonempty, oneOf } from './input.js';
+} from '../../common/guards/support-auth.js';
+import { nonempty, oneOf } from '../../common/input.js';
 
 @Injectable()
 export class AppealsService {

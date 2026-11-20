@@ -15,7 +15,7 @@ import {
   percentToBps,
   tkToPaisa,
 } from '../../common/money.js';
-import type { VehicleType } from '../../fleet/vehicle-type.js';
+import type { VehicleType } from '../fleet/vehicle-type.js';
 import type { UpdateFareRuleDto } from './dto/update-fare-rule.dto.js';
 import { FareRule } from './entities/fare-rule.entity.js';
 

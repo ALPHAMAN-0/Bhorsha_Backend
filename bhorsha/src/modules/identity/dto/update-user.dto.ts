@@ -11,7 +11,7 @@ import {
   MaxLength,
   ValidateIf,
 } from 'class-validator';
-import { Role } from '../../../users/entities/user.entity.js';
+import { Role } from '../entities/user.entity.js';
 import { trim, trimLower } from './user-fields.js';
 
 /**

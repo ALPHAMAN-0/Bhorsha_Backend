@@ -19,3 +19,12 @@ export const ApiPagination = () =>
       description: '1 to 50',
     }),
   );
+
+/** The limit query parameter of the cursor-paged support lists (cases, strikes, audit logs), for @ApiQuery(). */
+export const LIMIT_QUERY = {
+  name: 'limit',
+  required: false,
+  type: Number,
+  description: '1 to 100 (default 20)',
+  example: 20,
+};

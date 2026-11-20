@@ -4,8 +4,8 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { QueryFailedError } from 'typeorm';
-import { DriverProfile } from '../../fleet/entities/driver-profile.entity.js';
-import { Role, User } from '../../users/entities/user.entity.js';
+import { DriverProfile } from '../fleet/entities/driver-profile.entity.js';
+import { Role, User } from './entities/user.entity.js';
 import { AuthService } from './auth.service.js';
 import type { RegisterDto } from './dto/register.dto.js';
 

@@ -16,7 +16,7 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator.js';
 import { Roles } from '../../common/decorators/roles.decorator.js';
 import { ApiPagination } from '../../common/dto/page.js';
 import type { AuthUser } from '../../common/guards/auth-user.js';
-import { Role } from '../../users/entities/user.entity.js';
+import { Role } from './entities/user.entity.js';
 import { CreateStaffDto } from './dto/create-staff.dto.js';
 import { ListUsersQueryDto } from './dto/list-users-query.dto.js';
 import { UpdateUserDto } from './dto/update-user.dto.js';

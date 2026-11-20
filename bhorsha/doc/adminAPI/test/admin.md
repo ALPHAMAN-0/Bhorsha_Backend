@@ -77,7 +77,7 @@ My part answers both questions for **every route in the API**, and gives the adm
 ```text
 bhorsha/src/
 ├── main.ts                          global prefix /api/v1, ValidationPipe, Swagger with bearer auth
-├── app.module.ts                    registers AllExceptionsFilter; imports IdentityModule and FareRulesModule
+├── app.module.ts                    registers AllExceptionsFilter; imports IdentityModule and PricingModule
 ├── common/
 │   ├── decorators/
 │   │   ├── public.decorator.ts      @Public()
@@ -819,12 +819,14 @@ flowchart LR
 
 - **What happened:** the `src/modules/` skeleton on `main` had placeholder `FleetModule`, `PricingModule`, `TripsModule` and `NotifyModule` classes with no routes. The branches had the **real** modules with the same class names under `src/fleet`, `src/pricing`, `src/trips` and `src/notify`. Nest can't load two modules under one name in the same import list.
 - **Fix:** load the real modules and leave the placeholders in the repo, unused.
-- **Today:** 3 of the 4 placeholders are still unused (`modules/fleet`, `modules/trips`, `modules/notify`). `modules/pricing` is no longer a placeholder: it became **my real fare-rules module**. That's why `app.module.ts` imports it with an alias, `PricingModule as FareRulesModule`: Numman's fare-quote module in `src/pricing` is also called `PricingModule`.
+- **Until 21 Nov:** 3 of the 4 placeholders stayed unused (`modules/fleet`, `modules/trips`, `modules/notify`). `modules/pricing` became **my real fare-rules module**, imported with an alias, `PricingModule as FareRulesModule`, because Numman's fare-quote module in `src/pricing` had the same name.
+- **Since 21 Nov:** the driver and rider code lives in `src/modules/` too and the placeholders are gone. The fare quote is part of `modules/pricing`, so there is one `PricingModule` and no alias.
 
 ### 9.6 Problem 5: two routes that catch the same URL
 
 - **What happened:** Sumaiya has `GET /rides/open` (`src/fleet/driver-rides.controller.ts`) and Numman has `GET /rides/:id` (`src/trips/trips.controller.ts`). Express matches routes in the order they are registered. If Numman's route came first, the word `open` would be read as a ride id.
 - **Fix:** keep `FleetModule` before `TripsModule` in `app.module.ts`, with a comment that explains why. Numman's branch already had this order; the merge `3d4e282` kept it and added the comment, so nobody "tidies" it away later.
+- **Since 21 Nov:** both controllers are in `src/modules/trips`, so the order is kept in `TripsModule`'s controller list (`DriverRidesController` first), with the same kind of comment.
 
 ### 9.7 Problem 6: the same file written twice
 

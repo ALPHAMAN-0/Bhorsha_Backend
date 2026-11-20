@@ -14,7 +14,7 @@ import {
   type Principal,
   ownOrOfficer,
   officer,
-} from './support-auth.js';
+} from '../../common/guards/support-auth.js';
 import {
   positiveId,
   optionalId,
@@ -22,7 +22,7 @@ import {
   oneOf,
   tkAsPaisa,
   limitOf,
-} from './input.js';
+} from '../../common/input.js';
 import { paisaToTk } from '../../common/money.js';
 import {
   CaseType,

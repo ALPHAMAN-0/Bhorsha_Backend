@@ -1,10 +1,11 @@
 import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Query, Req } from '@nestjs/common';
 import { ApiBody, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { CasesService } from './cases.service.js';
-import type { AuthRequest } from './support-auth.js';
-import { principal, officer } from './support-auth.js';
+import type { AuthRequest } from '../../common/guards/support-auth.js';
+import { principal, officer } from '../../common/guards/support-auth.js';
 import { auditContext } from './request-context.js';
-import { CASE_STATUS_QUERY, CREATE_CASE_BODY, LIMIT_QUERY, UPDATE_CASE_BODY, UPDATE_CASE_EXAMPLES } from './api-docs.js';
+import { LIMIT_QUERY } from '../../common/dto/page.js';
+import { CASE_STATUS_QUERY, CREATE_CASE_BODY, UPDATE_CASE_BODY, UPDATE_CASE_EXAMPLES } from './api-docs.js';
 @ApiTags('Support Domain')
 @Controller('cases')
 export class CasesController {

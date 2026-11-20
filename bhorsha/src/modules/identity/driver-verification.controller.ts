@@ -4,7 +4,7 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator.js';
 import { Roles } from '../../common/decorators/roles.decorator.js';
 import { ApiPagination } from '../../common/dto/page.js';
 import type { AuthUser } from '../../common/guards/auth-user.js';
-import { Role } from '../../users/entities/user.entity.js';
+import { Role } from './entities/user.entity.js';
 import { DriverVerificationService } from './driver-verification.service.js';
 import { ListDriversQueryDto } from './dto/list-drivers-query.dto.js';
 import { VerifyDriverDto } from './dto/verify-driver.dto.js';

@@ -1,8 +1,8 @@
 import { Body, Controller, Param, ParseIntPipe, Patch, Req } from '@nestjs/common';
 import { ApiBody, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AppealsService } from './appeals.service.js';
-import type { AuthRequest } from './support-auth.js';
-import { principal } from './support-auth.js';
+import type { AuthRequest } from '../../common/guards/support-auth.js';
+import { principal } from '../../common/guards/support-auth.js';
 import { auditContext } from './request-context.js';
 import { DECIDE_APPEAL_BODY } from './api-docs.js';
 @ApiTags('Support Domain')

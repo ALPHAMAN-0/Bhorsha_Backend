@@ -1,11 +1,12 @@
 import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Query, Req } from '@nestjs/common';
 import { ApiBody, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { StrikesService } from './strikes.service.js';
-import type { AuthRequest } from './support-auth.js';
-import { principal, officer } from './support-auth.js';
+import type { AuthRequest } from '../../common/guards/support-auth.js';
+import { principal, officer } from '../../common/guards/support-auth.js';
 import { auditContext } from './request-context.js';
 import { AppealsService } from './appeals.service.js';
-import { APPEAL_BODY, CREATE_STRIKE_BODY, LIMIT_QUERY, STRIKE_STATUS_QUERY, UPDATE_STRIKE_BODY } from './api-docs.js';
+import { LIMIT_QUERY } from '../../common/dto/page.js';
+import { APPEAL_BODY, CREATE_STRIKE_BODY, STRIKE_STATUS_QUERY, UPDATE_STRIKE_BODY } from './api-docs.js';
 @ApiTags('Support Domain')
 @Controller('strikes')
 export class StrikesController {

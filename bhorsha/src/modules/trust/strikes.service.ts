@@ -14,14 +14,14 @@ import {
   type Principal,
   officer,
   ownOrOfficer,
-} from './support-auth.js';
+} from '../../common/guards/support-auth.js';
 import {
   positiveId,
   nonempty,
   oneOf,
   limitOf,
   futureDate,
-} from './input.js';
+} from '../../common/input.js';
 import { StrikeStatus } from './entities/strike.entity.js';
 
 @Injectable()

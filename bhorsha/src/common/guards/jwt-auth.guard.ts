@@ -9,7 +9,7 @@ import { Reflector } from '@nestjs/core';
 import { AuthGuard } from '@nestjs/passport';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { User } from '../../users/entities/user.entity.js';
+import { User } from '../../modules/identity/entities/user.entity.js';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator.js';
 import {
   type AuthenticatedRequest,

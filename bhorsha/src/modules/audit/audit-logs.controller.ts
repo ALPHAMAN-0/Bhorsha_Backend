@@ -1,9 +1,9 @@
 import { Controller, Get, Param, Query, Req } from '@nestjs/common';
 import { ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { AuditLogsService } from './audit-logs.service.js';
-import type { AuthRequest } from '../trust/support-auth.js';
-import { officer, principal } from '../trust/support-auth.js';
-import { LIMIT_QUERY } from '../trust/api-docs.js';
+import type { AuthRequest } from '../../common/guards/support-auth.js';
+import { officer, principal } from '../../common/guards/support-auth.js';
+import { LIMIT_QUERY } from '../../common/dto/page.js';
 @ApiTags('Support Domain')
 @Controller('audit-logs')
 export class AuditLogsController {

@@ -1,7 +1,7 @@
 import { UnauthorizedException } from '@nestjs/common';
 import type { Request } from 'express';
 import type { Repository } from 'typeorm';
-import type { Role, User } from '../../users/entities/user.entity.js';
+import type { Role, User } from '../../modules/identity/entities/user.entity.js';
 
 /** The logged-in user that the global JwtAuthGuard puts on request.user. */
 export interface AuthUser {

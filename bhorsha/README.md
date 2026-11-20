@@ -230,7 +230,7 @@ The filter turns PostgreSQL errors 23505, 23503 and 23514 into these 409s by con
 | GET | `/fare-rules` | Admin | The fare rule for each vehicle type |
 | PATCH | `/fare-rules/:id` | Admin | Change `baseTk`, `perKmTk` or `shareDiscountPercent` (amounts in Tk). Above the legal ceiling → 409; the ceiling itself can't be changed → 400 |
 
-### Driver: Sumaiya Akter Roshni (`src/fleet`)
+### Driver: Sumaiya Akter Roshni (`src/modules/fleet`, `trips`, `sharing`)
 
 | Method | Path | Access | What it does |
 |---|---|---|---|
@@ -251,7 +251,7 @@ The filter turns PostgreSQL errors 23505, 23503 and 23514 into these 409s by con
 | DELETE | `/route-offers/:id` | Owner driver | Withdraw an offer |
 | POST | `/rides/:id/invites` | Assigned driver | Invite a waiting rider going the same way (core feature) |
 
-### Rider: Numman (`src/trips`, `src/pricing`, `src/safety`, `src/notify`)
+### Rider: Numman (`src/modules/trips`, `sharing`, `pricing`, `safety`, `notify`)
 
 | Method | Path | Access | What it does |
 |---|---|---|---|
@@ -301,36 +301,42 @@ bhorsha/
 │   ├── app.module.ts            config, TypeORM (synchronize off), every module, the global filter
 │   ├── common/
 │   │   ├── decorators/          @Public(), @Roles(), @CurrentUser() (Siam); @CurrentUserId() (shared)
-│   │   ├── dto/                 PaginationQueryDto (Roshni); Page<T>, @ApiPagination() (Siam)
+│   │   ├── dto/                 PaginationQueryDto (Roshni); Page<T>, @ApiPagination() (Siam); LIMIT_QUERY (Anyka)
 │   │   ├── filters/             global exception filter and the PostgreSQL error map (Siam)
-│   │   ├── guards/              JwtAuthGuard, RolesGuard (Siam)
-│   │   └── interceptors/        timing and the response envelope (Roshni)
+│   │   ├── guards/              JwtAuthGuard, RolesGuard (Siam); support-auth.ts (Anyka)
+│   │   ├── interceptors/        timing and the response envelope (Roshni)
+│   │   ├── input.ts             body checks for the support endpoints (Anyka)
+│   │   ├── money.ts             Tk <-> paisa
+│   │   └── transaction.ts       Tx: one transaction that two modules write in (the seat transaction)
 │   ├── config/                  env validation (Numman)
-│   ├── users/                   User entity (Roshni, Siam)
-│   ├── fleet/                   driver profiles, vehicles, open rides, accept, pickup,
-│   │                            drop-off, route offers, invites (Roshni)
-│   ├── trips/                   rides, passengers, join requests, ratings (Numman)
-│   ├── pricing/                 the fare quote (Numman)
-│   ├── safety/                  SOS (Numman)
-│   ├── notify/                  SOS email through SMTP (Numman)
-│   └── modules/
-│       ├── identity/            auth, users, driver verification (Siam)
-│       ├── pricing/             fare rules (Siam)
-│       ├── trust/               cases, strikes, appeals (Anyka)
-│       ├── audit/               audit logs (Anyka)
-│       └── fleet/, trips/, sharing/, notify/   empty placeholders, not loaded (see below)
+│   └── modules/                 the modules of the architecture (root README section 8)
+│       ├── identity/            users: auth, users, driver verification (Siam); User entity (Roshni)
+│       ├── fleet/               driver_profiles, vehicles: own profile, status, location, vehicles (Roshni)
+│       ├── pricing/             fare_rules: fare rules (Siam); the fare quote, PricingService (Numman)
+│       ├── trips/               rides, ride_passengers, ratings: booking, cancel, ratings (Numman);
+│       │                        open requests, accept, arrive, pickup, drop-off (Roshni)
+│       ├── sharing/             route_offers, join_requests: nearby, join requests, the seat transaction
+│       │                        (Numman); route offers, invites (Roshni)
+│       ├── safety/              no table yet: SOS, emailed to the safety inbox (Numman)
+│       ├── trust/               support_cases, strikes, appeals (Anyka)
+│       ├── audit/               audit_logs (Anyka)
+│       └── notify/              no table: email through SMTP (Numman)
 ├── test/                        end-to-end tests (Vitest + Supertest)
 ├── doc/                         databaseSQL.md, draw.io diagrams, setup photos
 ├── docker-compose.yml           PostgreSQL 16 (siam001/bhorsha-db:2.0.0) and Mailpit
 └── .env.example                 copy to .env
 ```
 
-The architecture's target layout (§9) puts every module under `src/modules/`. The admin and support code follows it. The driver and rider code is still in top-level folders (`src/fleet`, `src/trips`, …). The empty classes in `src/modules/fleet`, `trips`, `sharing` and `notify` are left over from that layout and aren't imported anywhere. Moving the code is a team decision.
+Every module lives in `src/modules/` (the architecture's layout, §9) and follows its boundary rules (root README §8):
 
-Two things in `app.module.ts` matter:
+- A module's tables are written only by that module (doc/databaseSQL.md section 1 lists who owns what).
+- To use another module, a module imports it and calls a service it exports. `trips` and `sharing` use `fleet`'s `DriversService` and `VehiclesService` and `pricing`'s `PricingService`. `sharing` and `safety` use `trips`'s `RidesService`. `safety` sends its email through `notify`.
+- The seat transaction is one transaction across two modules. `sharing` runs it and writes `route_offers` and `join_requests`. `trips` writes `rides` and `ride_passengers` through `RidesService`, which receives the same `Tx` (`common/transaction.ts`).
 
-- `FleetModule` must stay before `TripsModule`. Otherwise `GET /rides/:id` would catch `GET /rides/open`.
-- Siam's `src/modules/pricing` is imported as `FareRulesModule`, because Numman's `src/pricing` module is also called `PricingModule`.
+Two things about route order matter:
+
+- In `TripsModule`, `DriverRidesController` must stay before `RidesController`. Otherwise `GET /rides/:id` would catch `GET /rides/open`.
+- The module order in `app.module.ts` is the order Swagger lists its groups (Driver Domain, then the admin groups, then Support).
 
 ## Adding an endpoint
 

@@ -1,7 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { IsIn, IsNotEmpty, IsString, MaxLength, ValidateIf } from 'class-validator';
-import { DriverVerification } from '../../../fleet/entities/driver-profile.entity.js';
+import { DriverVerification } from '../../fleet/entities/driver-profile.entity.js';
 import { trim } from './user-fields.js';
 
 export const REVIEW_DECISIONS = [

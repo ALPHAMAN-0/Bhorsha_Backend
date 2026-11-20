@@ -1,7 +1,9 @@
 import { Module } from '@nestjs/common';
-import { MailService } from './mail.service.js';
+import { NotifyService } from './notify.service.js';
 
+/** Sends email over SMTP (Mailpit in development). TripsModule uses it for SOS alerts. */
 @Module({
-  providers: [MailService]
+  providers: [NotifyService],
+  exports: [NotifyService],
 })
 export class NotifyModule {}
